@@ -1,0 +1,61 @@
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+### LaTeX – fichiers temporaires ###
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.brf
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+*.xdv
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.ist
+
+### LaTeX – fichiers intermédiaires ###
+*.dvi
+*.ps
+
+### Latexmk ###
+latexmkrc
+
+### Éditeurs ###
+*.swp
+*.swo
+*.swn
+*~
+.#*
+.vscode/
+.idea/
+
+### Images à ignorer ###
+*.png
+*.jpg
+*.jpeg
+*.ppm
+
+### Autres fichiers spécifiques ###
+*.flo
+*.tar
+*.keras
+*.t7
+

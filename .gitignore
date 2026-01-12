@@ -58,4 +58,10 @@ latexmkrc
 *.tar
 *.keras
 *.t7
+*.txt
+*.maf
+*.mtc
+*.mtc0
+*.pdf
+*.inputs
 

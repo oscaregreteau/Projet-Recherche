@@ -6,17 +6,16 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import backend as K
 from config import CONFIG_FLOWNET, CONFIG_TRAINING
-from utils.warp import warp_image as warp
+from utils.warp import warp_image
 from utils.utils import get_train_val_test, normalize_images
 import utils.utils_io as uio
+import matplotlib.pyplot as plt
 
 class FlowNet:
     def __init__(self, config):
         self.config = config
         self.model = self._construct_network(config)
 
-    # def call(self, inputs, training=False):
-    #     return self.backbone(inputs, training=training)
     def __getattr__(self, attr):
         return getattr(self.model, attr)
 
@@ -72,10 +71,6 @@ class FlowNet:
         return FlowNet.get_simple_model(config)
 
 class DataGenerator:
-    """ Instantiate then call instance.next_train() to get a generator for training images/labels
-            call instance.next_val() to get a generator for validation images/labels
-    """
-
     def __init__(self,
                  network_type: str,
                  flo_normalization: Tuple[float, float],
@@ -120,7 +115,6 @@ class DataGenerator:
 
 
     def next_val(self):
-
         while True:
             images = np.random.choice(self.val, self.validation_batch_size, replace=False)
             img1 = [uio.read(str(img)) for img in images]
@@ -137,49 +131,6 @@ class DataGenerator:
                 raise MalformedNetworkType(f'{self.network_type}: {MalformedNetworkType.__doc__}')
 
             yield (images)
-
-    # def _augment(self, img1, img2):
-    #     img1 = tf.convert_to_tensor(img1, dtype=tf.float32)
-    #     img2 = tf.convert_to_tensor(img2, dtype=tf.float32)
-    #     # Augmentations are more awkward because of the Siamese architecture, I can't justify applying different color transforms to each image independently
-    #     # I'm 100 certain there is a better way to do this as this is extremely inefficient with each call likely containing some portion of each other call.
-    #     r = np.random.rand(len(self.augmentations))
-    #     r_inc = 0  # This, with r, are used to randomly turn on/off augmentations so that not every augmentation is applied each time
-    #     r_onoff = 2/5
-    #     if 'brightness' in self.augmentations and r[r_inc] <= r_onoff:
-    #         rdm = np.random.rand(self.batch_size) * self.augmentations['brightness']
-    #         def brt(x, idx): return tf.image.adjust_brightness(x, rdm[idx])
-    #         img1 = tf.stack([brt(im, idx) for idx, im in enumerate(img1)], axis=0)
-    #         img2 = tf.stack([brt(im, idx) for idx, im in enumerate(img2)], axis=0)
-    #         r_inc += 1
-    #     if 'multiplicative_colour' in self.augmentations and r[r_inc] <= r_onoff:
-    #         rdm = np.random.rand(self.batch_size, 3) * (self.augmentations['multiplicative_colour'][1] -
-    #                                                     self.augmentations['multiplicative_colour'][0]) + self.augmentations['multiplicative_colour'][0]
-
-    #         def mc(x, idx): return x * rdm[idx]
-    #         img1 = tf.clip_by_value(tf.stack([mc(im, idx) for idx, im in enumerate(img1)], axis=0), clip_value_min=0, clip_value_max=1)
-    #         img2 = tf.clip_by_value(tf.stack([mc(im, idx) for idx, im in enumerate(img2)], axis=0), clip_value_min=0, clip_value_max=1)
-    #         r_inc += 1
-    #     if 'gamma' in self.augmentations and r[r_inc] <= r_onoff:
-    #         rdm = np.random.rand(self.batch_size) * (self.augmentations['gamma'][1] - self.augmentations['gamma'][0]) + self.augmentations['gamma'][0]
-    #         def gam(x, idx): return tf.image.adjust_gamma(x, gamma=rdm[idx])
-    #         img1 = tf.stack([gam(im, idx) for idx, im in enumerate(img1)], axis=0)
-    #         img2 = tf.stack([gam(im, idx) for idx, im in enumerate(img2)], axis=0)
-    #         r_inc += 1
-    #     if 'contrast' in self.augmentations and r[r_inc] <= r_onoff:
-    #         rdm = np.random.rand(self.batch_size) * (self.augmentations['contrast'][1] - self.augmentations['contrast'][0]) + self.augmentations['contrast'][0]
-    #         def cts(x, idx): return tf.image.adjust_contrast(x, contrast_factor=rdm[idx])
-    #         img1 = tf.stack([cts(im, idx) for idx, im in enumerate(img1)], axis=0)
-    #         img2 = tf.stack([cts(im, idx) for idx, im in enumerate(img2)], axis=0)
-    #         r_inc += 1
-    #     if 'gaussian_noise' in self.augmentations and r[r_inc] <= r_onoff:
-    #         rdm = np.random.rand(self.batch_size) * self.augmentations['gaussian_noise']
-    #         def gau(x, idx): return x + tf.random.normal(x.shape, mean=0.0, stddev=rdm[idx], dtype=x.dtype)
-    #         img1 = tf.clip_by_value(tf.stack([gau(im, idx) for idx, im in enumerate(img1)], axis=0), clip_value_min=0, clip_value_max=1)
-    #         img2 = tf.clip_by_value(tf.stack([gau(im, idx) for idx, im in enumerate(img2)], axis=0), clip_value_min=0, clip_value_max=1)
-    #         r_inc += 1
-
-    #     return img1, img2
 
 class lossphoto(tf.keras.losses.Loss):
 
@@ -198,13 +149,19 @@ class lossphoto(tf.keras.losses.Loss):
 
     def call(self, y_true, y_pred):
         image1, image2 = tf.split(y_true, num_or_size_splits=2, axis=-1)
-        flow_pred = y_pred  # [B,H,W,2]
-        warped_I2 = warp.warp_image(image2, flow_pred)
-        photometric_loss = tf.reduce_mean(tf.abs(image1 - warped_I2))
-        dx = tf.abs(flow_pred[:, :, 1:, :] - flow_pred[:, :, :-1, :])
-        dy = tf.abs(flow_pred[:, 1:, :, :] - flow_pred[:, :-1, :, :])
+        H_pred, W_pred = tf.shape(y_pred)[1], tf.shape(y_pred)[2]
+        image1_small = tf.image.resize(image1, [H_pred, W_pred])
+        image2_small = tf.image.resize(image2, [H_pred, W_pred])
+
+        warped_I2 = warp_image(image2_small, y_pred)
+        photometric_loss = tf.reduce_mean(tf.abs(image1_small - warped_I2))
+
+        dx = tf.abs(y_pred[:, :, 1:, :] - y_pred[:, :, :-1, :])
+        dy = tf.abs(y_pred[:, 1:, :, :] - y_pred[:, :-1, :, :])
         smoothness_loss = tf.reduce_mean(dx) + tf.reduce_mean(dy)
-        return photometric_loss + self.lambda_smooth * smoothness_loss
+        lambda_smooth = 0.5
+        return photometric_loss + lambda_smooth * smoothness_loss
+
 
 
 def main():
@@ -226,11 +183,21 @@ def main():
                                    config_training['test_ratio'],
                                    config_training['shuffle'],
                                    config_training['augmentations'])
-    flownet.fit(
+    history = flownet.fit(
         data_generator.next_train(),
-        steps_per_epoch=200 // config_training['batch_size'],
-        epochs=10
+        steps_per_epoch=200//config_training['batch_size'],
+        epochs=1
     )
+    flownet.save_weights('unsupflow.weights.h5')
+    for key in history.history:
+        if 'loss' in key and key != 'loss':  # skip overall loss
+            plt.plot(history.history[key], label=key)
+
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Per-output Loss per Epoch')
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":

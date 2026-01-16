@@ -64,4 +64,4 @@ latexmkrc
 *.mtc0
 *.pdf
 *.inputs
-
+*.h5

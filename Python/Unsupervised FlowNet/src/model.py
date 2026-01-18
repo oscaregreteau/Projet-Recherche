@@ -10,6 +10,9 @@ from utils.warp import warp_image
 from utils.utils import get_train_val_test, normalize_images
 import utils.utils_io as uio
 import matplotlib.pyplot as plt
+from huggingface_hub import HfApi, login
+import os
+
 
 class FlowNet:
     def __init__(self, config):
@@ -100,9 +103,6 @@ class DataGenerator:
             img1 = normalize_images(img1)
             img2 = normalize_images(img2)
 
-            # if not self.augmentations is None:
-            #     img1, img2 = self._augment(img1, img2)
-
             if self.network_type == 'simple':
                 images = np.concatenate([img1, img2], axis=-1)
             elif self.network_type == 'correlation':
@@ -163,6 +163,66 @@ class lossphoto(tf.keras.losses.Loss):
         return photometric_loss + lambda_smooth * smoothness_loss
 
 
+login(token="")
+
+REPO_ID = "oscaregreteau/flow"
+api = HfApi()
+
+class HuggingFaceCheckpoint(tf.keras.callbacks.Callback):
+    def __init__(self, save_every=1, log_file="loss_log.txt"):
+        super().__init__()
+        self.save_every = save_every
+        self.last_weight_file = None
+        self.log_file = log_file
+        with open(self.log_file, 'w') as f:
+            f.write("epoch,loss," + ",".join([f"predict_{i}_loss" for i in range(1, 7)]) + "\n")
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        epoch_num = epoch + 1
+
+        if epoch_num % self.save_every == 0:
+            weight_file = f"weights_epoch_{epoch_num}.weights.h5"
+            self.model.save_weights(weight_file)
+            # Upload the weights
+            api.upload_file(
+                path_or_fileobj=weight_file,
+                path_in_repo=weight_file,
+                repo_id=REPO_ID,
+                repo_type="model",
+                commit_message=f"Add weights for epoch {epoch_num}"
+            )
+            if self.last_weight_file:
+                try:
+                    print(f"Deleting previous file: {self.last_weight_file}")
+                    api.delete_file(
+                        repo_id=REPO_ID,
+                        path_in_repo=self.last_weight_file,
+                        repo_type="model",
+                        commit_message=f"Remove weights from previous epoch",
+                        token=True
+                    )
+                    print("Previous file deleted successfully.")
+                except Exception as e:
+                    print(f"Warning: could not delete previous weights: {e}")
+            os.remove(weight_file)
+            self.last_weight_file = weight_file
+
+        with open(self.log_file, 'a') as f:
+            overall_loss = logs.get('loss', 0)
+            per_output_losses = [logs.get(f'predict_{i}_loss', 0) for i in range(1, 7)]
+            f.write(f"{epoch_num},{overall_loss:.6f}," + ",".join(f"{v:.6f}" for v in per_output_losses) + "\n")
+
+        api.upload_file(
+            path_or_fileobj=self.log_file,
+            path_in_repo=self.log_file,
+            repo_id=REPO_ID,
+            repo_type="model",
+            commit_message=f"Update loss log after epoch {epoch_num}"
+        )
+
+        print(f"Epoch {epoch_num}: Weights and loss log updated.")
+
 
 def main():
     config_network = deepcopy(CONFIG_FLOWNET)
@@ -186,9 +246,9 @@ def main():
     history = flownet.fit(
         data_generator.next_train(),
         steps_per_epoch=200//config_training['batch_size'],
-        epochs=1
+        epochs=5,
+        callbacks=[HuggingFaceCheckpoint(save_every=1)]
     )
-    flownet.save_weights('unsupflow.weights.h5')
     for key in history.history:
         if 'loss' in key and key != 'loss':  # skip overall loss
             plt.plot(history.history[key], label=key)

@@ -133,19 +133,9 @@ class DataGenerator:
             yield (images)
 
 class lossphoto(tf.keras.losses.Loss):
-
-    def warp_image(img, flow):
-        B,H,W,_ = tf.shape(img)
-        grid_x, grid_y = tf.meshgrid(tf.range(W), tf.range(H))
-        coords = tf.stack([grid_x, grid_y], axis=-1) 
-        coords = tf.cast(coords, tf.float32)
-        coords = coords[None] + flow                  
-        coords_x = 2.0 * coords[...,0] / (W-1) - 1.0
-        coords_y = 2.0 * coords[...,1] / (H-1) - 1.0
-        grid = tf.stack([coords_x, coords_y], axis=-1)
-        warped = tfa.image.resampler(img, grid)
-        return warped
-
+    def charbonnier(x,alpha):
+        eps=1e-5
+        return (X**2+eps**2)**alpha
 
     def call(self, y_true, y_pred):
         image1, image2 = tf.split(y_true, num_or_size_splits=2, axis=-1)
@@ -154,16 +144,16 @@ class lossphoto(tf.keras.losses.Loss):
         image2_small = tf.image.resize(image2, [H_pred, W_pred])
 
         warped_I2 = warp_image(image2_small, y_pred)
-        photometric_loss = tf.reduce_mean(tf.abs(image1_small - warped_I2))
+        photometric_loss = tf.reduce_mean(charbonnier(image1_small - warped_I2,0.25))
 
-        dx = tf.abs(y_pred[:, :, 1:, :] - y_pred[:, :, :-1, :])
-        dy = tf.abs(y_pred[:, 1:, :, :] - y_pred[:, :-1, :, :])
+        dx = charbonnier(y_pred[:, :, 1:, :] - y_pred[:, :, :-1, :],0.37)
+        dy = charbonnier(y_pred[:, 1:, :, :] - y_pred[:, :-1, :, :],0.37)
         smoothness_loss = tf.reduce_mean(dx) + tf.reduce_mean(dy)
-        lambda_smooth = 0.5
+        lambda_smooth = 1
         return photometric_loss + lambda_smooth * smoothness_loss
 
 
-login(token="")
+# login(token="")
 
 REPO_ID = "oscaregreteau/flow"
 api = HfApi()
@@ -230,7 +220,7 @@ def main():
     flownet = FlowNet(config_network)
     loss=lossphoto()
     flownet.compile(
-        optimizer=tf.keras.optimizers.Adam(1e-4),
+        optimizer=tf.keras.optimizers.Adam(1.6e-5),
         loss=[loss,loss,loss,loss,loss,loss],
         loss_weights=config_training['loss_weights'][::-1]
     )
@@ -246,13 +236,13 @@ def main():
     history = flownet.fit(
         data_generator.next_train(),
         steps_per_epoch=200//config_training['batch_size'],
-        epochs=5,
-        callbacks=[HuggingFaceCheckpoint(save_every=1)]
+        epochs=5#,
+        #callbacks=[HuggingFaceCheckpoint(save_every=1)]
     )
+    flownet.save_weights("flownet.weights.h5")
     for key in history.history:
         if 'loss' in key and key != 'loss':  # skip overall loss
             plt.plot(history.history[key], label=key)
-
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Per-output Loss per Epoch')

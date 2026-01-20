@@ -39,28 +39,28 @@ class FlowNet:
 
         predict_6 = tf.keras.layers.Conv2D(name='predict_6', filters=2, kernel_size=3, strides=1, padding='same', activation=None)(conv_6_1)
 
-        upconv_5 = tf.keras.layers.Conv2DTranspose(name='upconv_5', filters=512, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(conv_6)
-        flow_6 = tf.keras.layers.Conv2DTranspose(name='flow_6', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(predict_6)
+        upconv_5 = tf.keras.layers.Conv2DTranspose(name='upconv_5', filters=512, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(conv_6_1)
+        flow_6 = tf.keras.layers.Conv2DTranspose(name='flow_6', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=None)(predict_6)#tf.keras.activations.relu
         concat_5 = tf.keras.layers.Concatenate(name='concat_5', axis=-1)([upconv_5, conv_5_1, flow_6])
         predict_5 = tf.keras.layers.Conv2D(name='predict_5', filters=2, kernel_size=3, strides=1, padding='same', activation=None)(concat_5)
 
         upconv_4 = tf.keras.layers.Conv2DTranspose(name='upconv_4', filters=256, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(concat_5)
-        flow_5 = tf.keras.layers.Conv2DTranspose(name='flow_5', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(predict_5)
+        flow_5 = tf.keras.layers.Conv2DTranspose(name='flow_5', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=None)(predict_5)#tf.keras.activations.relu
         concat_4 = tf.keras.layers.Concatenate(name='concat_4', axis=-1)([upconv_4, conv_4_1, flow_5])
         predict_4 = tf.keras.layers.Conv2D(name='predict_4', filters=2, kernel_size=3, strides=1, padding='same', activation=None)(concat_4)
 
         upconv_3 = tf.keras.layers.Conv2DTranspose(name='upconv_3', filters=128, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(concat_4)
-        flow_4 = tf.keras.layers.Conv2DTranspose(name='flow_4', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(predict_4)
+        flow_4 = tf.keras.layers.Conv2DTranspose(name='flow_4', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=None)(predict_4)#tf.keras.activations.relu
         concat_3 = tf.keras.layers.Concatenate(name='concat_3', axis=-1)([upconv_3, conv_3_1, flow_4])
         predict_3 = tf.keras.layers.Conv2D(name='predict_3', filters=2, kernel_size=3, strides=1, padding='same', activation=None)(concat_3)
 
         upconv_2 = tf.keras.layers.Conv2DTranspose(name='upconv_2', filters=64, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(concat_3)
-        flow_3 = tf.keras.layers.Conv2DTranspose(name='flow_3', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(predict_3)
+        flow_3 = tf.keras.layers.Conv2DTranspose(name='flow_3', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=None)(predict_3)#tf.keras.activations.relu
         concat_2 = tf.keras.layers.Concatenate(name='concat_2', axis=-1)([upconv_2, conv_2, flow_3])
         predict_2 = tf.keras.layers.Conv2D(name='predict_2', filters=2, kernel_size=3, strides=1, padding='same', activation=None)(concat_2)
 
         upconv_1 = tf.keras.layers.Conv2DTranspose(name='upconv_1', filters=64, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(concat_2)
-        flow_2 = tf.keras.layers.Conv2DTranspose(name='flow_2', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=tf.keras.activations.relu)(predict_2)
+        flow_2 = tf.keras.layers.Conv2DTranspose(name='flow_2', filters=2, kernel_size=(4, 4), strides=2, padding='same', activation=None)(predict_2)#tf.keras.activations.relu
         concat_1 = tf.keras.layers.Concatenate(name='concat_1', axis=-1)([upconv_1, conv_1, flow_2])
         predict_1 = tf.keras.layers.Conv2D(name='predict_1', filters=2, kernel_size=3, strides=1, padding='same', activation=None)(concat_1)
 
@@ -109,9 +109,10 @@ class DataGenerator:
                 raise NotImplementedError()
             else:
                 raise MalformedNetworkType(f'{self.network_type}: {MalformedNetworkType.__doc__}')
-            dummy_targets = np.zeros((self.batch_size, *self.output_shape))
-            dummy_targets_list = tuple([dummy_targets] * 6 ) 
-            yield (images, dummy_targets_list)
+            targets = np.concatenate([img1, img2], axis=-1)  # (B,H,W,6)
+            targets_list = tuple([targets] * 6)
+            yield images, targets_list  
+
 
 
     def next_val(self):
@@ -133,24 +134,42 @@ class DataGenerator:
             yield (images)
 
 class lossphoto(tf.keras.losses.Loss):
-    def charbonnier(x,alpha):
-        eps=1e-5
-        return (X**2+eps**2)**alpha
+
+    @staticmethod
+    def charbonnier(x, alpha=0.25):
+        eps = 1e-5
+        return tf.pow(x * x + eps * eps, alpha)
 
     def call(self, y_true, y_pred):
-        image1, image2 = tf.split(y_true, num_or_size_splits=2, axis=-1)
-        H_pred, W_pred = tf.shape(y_pred)[1], tf.shape(y_pred)[2]
-        image1_small = tf.image.resize(image1, [H_pred, W_pred])
-        image2_small = tf.image.resize(image2, [H_pred, W_pred])
+        image1, image2 = tf.split(y_true, 2, axis=-1)
 
-        warped_I2 = warp_image(image2_small, y_pred)
-        photometric_loss = tf.reduce_mean(charbonnier(image1_small - warped_I2,0.25))
+        H = tf.shape(image1)[1]
+        W = tf.shape(image1)[2]
+        h = tf.shape(y_pred)[1]
+        w = tf.shape(y_pred)[2]
 
-        dx = charbonnier(y_pred[:, :, 1:, :] - y_pred[:, :, :-1, :],0.37)
-        dy = charbonnier(y_pred[:, 1:, :, :] - y_pred[:, :-1, :, :],0.37)
-        smoothness_loss = tf.reduce_mean(dx) + tf.reduce_mean(dy)
-        lambda_smooth = 1
-        return photometric_loss + lambda_smooth * smoothness_loss
+        image1_s = tf.image.resize(image1, [h, w])
+        image2_s = tf.image.resize(image2, [h, w])
+
+        scale_x = tf.cast(W, tf.float32) / tf.cast(w, tf.float32)
+        scale_y = tf.cast(H, tf.float32) / tf.cast(h, tf.float32)
+
+        flow_scaled = tf.stack([
+            y_pred[..., 0] * scale_x,
+            y_pred[..., 1] * scale_y
+        ], axis=-1)
+
+        warped_I2 = warp_image(image2_s, flow_scaled)
+
+        photo = tf.reduce_mean(self.charbonnier(image1_s - warped_I2, 0.25))
+
+        dx = self.charbonnier(flow_scaled[:, :, 1:, :] - flow_scaled[:, :, :-1, :], 0.37)
+        dy = self.charbonnier(flow_scaled[:, 1:, :, :] - flow_scaled[:, :-1, :, :], 0.37)
+
+        smooth = tf.reduce_mean(dx) + tf.reduce_mean(dy)
+
+        return photo + smooth
+
 
 
 # login(token="")

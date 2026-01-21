@@ -178,49 +178,56 @@ REPO_ID = "oscaregreteau/flow"
 api = HfApi()
 
 class HuggingFaceCheckpoint(tf.keras.callbacks.Callback):
-    def __init__(self, save_every=1, log_file="loss_log.txt"):
+    def __init__(self, log_file="loss_log.txt"):
         super().__init__()
-        self.save_every = save_every
         self.last_weight_file = None
         self.log_file = log_file
-        with open(self.log_file, 'w') as f:
-            f.write("epoch,loss," + ",".join([f"predict_{i}_loss" for i in range(1, 7)]) + "\n")
+
+        if not os.path.exists(self.log_file):
+            with open(self.log_file, 'w') as f:
+                f.write(
+                    "epoch,loss," +
+                    ",".join([f"predict_{i}_loss" for i in range(1, 7)]) +
+                    "\n"
+                )
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
         epoch_num = epoch + 1
 
-        if epoch_num % self.save_every == 0:
-            weight_file = f"weights_epoch_{epoch_num}.weights.h5"
-            self.model.save_weights(weight_file)
-            # Upload the weights
-            api.upload_file(
-                path_or_fileobj=weight_file,
-                path_in_repo=weight_file,
-                repo_id=REPO_ID,
-                repo_type="model",
-                commit_message=f"Add weights for epoch {epoch_num}"
-            )
-            if self.last_weight_file:
-                try:
-                    print(f"Deleting previous file: {self.last_weight_file}")
-                    api.delete_file(
-                        repo_id=REPO_ID,
-                        path_in_repo=self.last_weight_file,
-                        repo_type="model",
-                        commit_message=f"Remove weights from previous epoch",
-                        token=True
-                    )
-                    print("Previous file deleted successfully.")
-                except Exception as e:
-                    print(f"Warning: could not delete previous weights: {e}")
-            os.remove(weight_file)
-            self.last_weight_file = weight_file
+        weight_file = f"weights_epoch_{epoch_num}.weights.h5"
+        self.model.save_weights(weight_file)
+
+        api.upload_file(
+            path_or_fileobj=weight_file,
+            path_in_repo=weight_file,
+            repo_id=REPO_ID,
+            repo_type="model",
+            commit_message=f"Update weights (epoch {epoch_num})"
+        )
+
+        if self.last_weight_file is not None:
+            try:
+                api.delete_file(
+                    repo_id=REPO_ID,
+                    path_in_repo=self.last_weight_file,
+                    repo_type="model",
+                    commit_message="Remove previous weights"
+                )
+            except Exception as e:
+                print(f"Warning: could not delete previous weights: {e}")
+
+        os.remove(weight_file)
+        self.last_weight_file = weight_file
 
         with open(self.log_file, 'a') as f:
             overall_loss = logs.get('loss', 0)
             per_output_losses = [logs.get(f'predict_{i}_loss', 0) for i in range(1, 7)]
-            f.write(f"{epoch_num},{overall_loss:.6f}," + ",".join(f"{v:.6f}" for v in per_output_losses) + "\n")
+            f.write(
+                f"{epoch_num},{overall_loss:.6f}," +
+                ",".join(f"{v:.6f}" for v in per_output_losses) +
+                "\n"
+            )
 
         api.upload_file(
             path_or_fileobj=self.log_file,
@@ -230,7 +237,9 @@ class HuggingFaceCheckpoint(tf.keras.callbacks.Callback):
             commit_message=f"Update loss log after epoch {epoch_num}"
         )
 
-        print(f"Epoch {epoch_num}: Weights and loss log updated.")
+        print(f"Epoch {epoch_num}: latest weights + loss log uploaded")
+
+
 
 
 def main():
@@ -238,11 +247,7 @@ def main():
     config_training = deepcopy(CONFIG_TRAINING)
     flownet = FlowNet(config_network)
     loss=lossphoto()
-    flownet.compile(
-        optimizer=tf.keras.optimizers.Adam(1.6e-5),
-        loss=[loss,loss,loss,loss,loss,loss],
-        loss_weights=config_training['loss_weights'][::-1]
-    )
+
     data_generator = DataGenerator(config_network['architecture'],
                                    config_network['flo_normalization'],
                                    Path(r'/Users/oscar/Downloads/FlyingChairs_release/data'),
@@ -252,16 +257,45 @@ def main():
                                    config_training['test_ratio'],
                                    config_training['shuffle'],
                                    config_training['augmentations'])
-    history = flownet.fit(
-        data_generator.next_train(),
-        steps_per_epoch=200//config_training['batch_size'],
-        epochs=5#,
-        #callbacks=[HuggingFaceCheckpoint(save_every=1)]
+    flownet.compile(
+        optimizer=tf.keras.optimizers.Adam(1.6e-5), #initial training with adam
+        loss=[loss] * 6,
+        loss_weights=config_training['loss_weights'][::-1]
     )
+
+    checkpoint_cb = HuggingFaceCheckpoint()
+
+    history_adam = flownet.fit(
+        data_generator.next_train(),
+        steps_per_epoch=200 // config_training['batch_size'],
+        epochs=2,
+        callbacks=[checkpoint_cb]
+    )
+
+    flownet.compile(
+        optimizer=tf.keras.optimizers.SGD(5e-5, momentum=0.9),  
+        loss=[loss] * 6,
+        loss_weights=config_training['loss_weights'][::-1]
+    )
+
+    history_sgd = flownet.fit(
+        data_generator.next_train(),
+        steps_per_epoch=200 // config_training['batch_size'],
+        epochs=5,
+        initial_epoch=2,
+        callbacks=[checkpoint_cb]
+    )
+
+    history = {}
+    for key in history_adam.history.keys():
+        history[key] = (
+            history_adam.history[key] +
+            history_sgd.history.get(key, [])
+        )
     flownet.save_weights("flownet.weights.h5")
-    for key in history.history:
+    for key in history:
         if 'loss' in key and key != 'loss':  # skip overall loss
-            plt.plot(history.history[key], label=key)
+            plt.plot(history[key], label=key)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Per-output Loss per Epoch')

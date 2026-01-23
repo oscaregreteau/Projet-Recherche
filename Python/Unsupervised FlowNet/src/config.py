@@ -12,7 +12,7 @@ CONFIG_TRAINING = {'img_path': Path(r'/Users/oscar/Downloads/FlyingChairs_releas
                    'train_ratio': 0.8,
                    'test_ratio': 0.1,
                    'shuffle': False,
-                   'batch_size': 16,
+                   'batch_size': 4,
                    'validation_batch_size': 16,
                    'learning_rate': 1e-4,
                    'augmentations': {'translation': [-0.2, 0.2],  # TODO: Not implemented

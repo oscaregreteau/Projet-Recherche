@@ -257,51 +257,30 @@ def main():
                                    config_training['test_ratio'],
                                    config_training['shuffle'],
                                    config_training['augmentations'])
-    flownet.compile(
-        optimizer=tf.keras.optimizers.Adam(1.6e-5), #initial training with adam
-        loss=[loss] * 6,
-        loss_weights=config_training['loss_weights'][::-1]
-    )
-
     checkpoint_cb = HuggingFaceCheckpoint()
-
-    history_adam = flownet.fit(
-        data_generator.next_train(),
-        steps_per_epoch=200 // config_training['batch_size'],
-        epochs=2,
-        callbacks=[checkpoint_cb]
-    )
-
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=1.6e-5, decay_steps=100000, decay_rate=0.5, staircase=True)
     flownet.compile(
-        optimizer=tf.keras.optimizers.SGD(5e-5, momentum=0.9),  
+        optimizer=tf.keras.optimizers.Adam(lr_schedule), 
         loss=[loss] * 6,
         loss_weights=config_training['loss_weights'][::-1]
     )
 
-    history_sgd = flownet.fit(
+    history = flownet.fit(
         data_generator.next_train(),
-        steps_per_epoch=200 // config_training['batch_size'],
-        epochs=5,
-        initial_epoch=2,
-        callbacks=[checkpoint_cb]
+        steps_per_epoch=22572 // config_training['batch_size'],
+        epochs=5#,
+        #callbacks=[checkpoint_cb]
     )
 
-    history = {}
-    for key in history_adam.history.keys():
-        history[key] = (
-            history_adam.history[key] +
-            history_sgd.history.get(key, [])
-        )
     flownet.save_weights("flownet.weights.h5")
-    for key in history:
+    for key in history.history:
         if 'loss' in key and key != 'loss':  # skip overall loss
-            plt.plot(history[key], label=key)
+            plt.plot(history.history[key], label=key)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Per-output Loss per Epoch')
     plt.legend()
     plt.show()
-
 
 if __name__ == "__main__":
     main()

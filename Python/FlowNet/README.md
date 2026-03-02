@@ -1,29 +1,27 @@
-### Run training
+# Supervised FlowNet Implementation in TensorFlow
 
+## Training the model
+
+This runs on Python 3. and requires the following packages :
+```
+tensorflow
+tqdm
+matplotlib
+```
+
+To run the file, just open a terminal in the ```src``` folder and run the following command :
 ```bash
-python train.py --data_path ./data_scene_flow/training --epochs 100 --batch_size 8 --lr 1e-4
+python train.py --data_path /yourdatapath --epochs 50 --batch_size 8 --lr 1e-4
 ```
+The batch size and the learning rate are defined as defined in the [FlowNet: Learning Optical Flow with Convolutional Networks](https://arxiv.org/abs/1504.06852) paper.
 
-On the first run you will see:
-```
-Starting from scratch
-Epoch 1/100: 100%|████████| 97/97 [05:23<00:00]
-Epoch 1/100 — Total: 0.5028 | Scale 1: 0.2452 | Scale 2: 0.1284 | Scale 3: 0.0773 | Scale 4: 0.0519
-```
+The losses (different scales and validation) will be written in a file called ```training_log.txt```. At the end of training, the weights will be saved as ```flownet.weights.h5```.
 
-On subsequent runs, training resumes automatically from the last checkpoint:
-```
-Restored from ./checkpoints/ckpt-1
-Epoch 6/100: ...
-```
+## Results
 
-| Scale | Weight |
-|---|---|
-| Scale 1 (finest) | 1.0 |
-| Scale 2 | 0.5 |
-| Scale 3 | 0.25 |
-| Scale 4 (coarsest) | 0.125 |
+After running on the [FlyingChairs Dataset](https://lmb.informatik.uni-freiburg.de/resources/datasets/FlyingChairs.en.html) for 50 epochs, we obtain the following loss curves : 
 
-The smoothness loss is weighted by `smooth_weight=0.1` relative to the photometric loss.
+(insert curves)
 
----
+This can also be trained on the Kitti Dataset.
+## Visualizing the results

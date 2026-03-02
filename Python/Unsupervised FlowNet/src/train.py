@@ -65,6 +65,6 @@ for epoch in range(args.epochs):
     if (epoch + 1) % 5 == 0:
         manager.save()
         print(f"Checkpoint saved at epoch {epoch + 1}")
-
+model.save_weights("flownet.weights.h5")
 log_file.close()
 print("Training complete.")

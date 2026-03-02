@@ -51,8 +51,6 @@ log_file = open("training_log.txt", "w")
 log_file.write("Type, Epoch, Total, Scale1, Scale2, Scale3, Scale4\n")
 
 for epoch in range(args.epochs):
-
-    # --- Training ---
     epoch_loss = 0.0
     epoch_scale_losses = None
     num_batches = 0

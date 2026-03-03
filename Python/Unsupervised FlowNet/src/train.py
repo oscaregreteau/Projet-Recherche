@@ -7,9 +7,8 @@ from tqdm import tqdm
 from utils import visualize
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=100)
-parser.add_argument('--batch_size', type=int, default=8)
-parser.add_argument('--lr', type=float, default=1e-4)
+parser.add_argument('--epochs', type=int, default=50)
+parser.add_argument('--batch_size', type=int, default=4)
 parser.add_argument('--data_path', type=str, default='./data')
 parser.add_argument('--checkpoint_dir', type=str, default='./checkpoints')
 args = parser.parse_args()
@@ -17,7 +16,14 @@ args = parser.parse_args()
 train_dataset = get_dataset(args.data_path, args.batch_size)
 
 model = FlowNet()
-optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
+
+lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+    initial_learning_rate=1.6e-5,
+    decay_steps=100000,
+    decay_rate=0.5,
+    staircase=True  # hard steps, not smooth decay
+)
+optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, beta_1=0.9, beta_2=0.999)
 
 checkpoint = tf.train.Checkpoint(model=model, optimizer=optimizer)
 manager = tf.train.CheckpointManager(checkpoint, args.checkpoint_dir, max_to_keep=3)
@@ -33,10 +39,10 @@ def train_step(frame1, frame2):
     with tf.GradientTape() as tape:
         inputs = tf.concat([frame1, frame2], axis=-1)
         flows = model(inputs, training=True)
-        loss = multiscale_loss(flows, frame1, frame2)
+        loss, scale_losses = multiscale_loss(flows, frame1, frame2)
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-    return loss
+    return loss, scale_losses
 
 log_file = open("training_log.txt", "w")
 log_file.write("Epoch, Total, Scale1, Scale2, Scale3, Scale4\n")

@@ -75,17 +75,17 @@ class FlowNet(tf.keras.Model):
         
         flow5 = self.predict_5(concat5)
         up_flow5 = self.upconvflow5(flow5)
-        out_upconv4 = self.upconv4(concat5, training=training)
+        out_upconv4 = self.upconv4(x5_1, training=training)
         concat4 = tf.concat([x4_1, out_upconv4, up_flow5], axis=-1)
 
         flow4 = self.predict_4(concat4)
         up_flow4 = self.upconvflow4(flow4)
-        out_upconv3 = self.upconv3(concat4, training=training)
+        out_upconv3 = self.upconv3(x4_1, training=training)
         concat3 = tf.concat([x3_1, out_upconv3, up_flow4], axis=-1)
 
         flow3 = self.predict_3(concat3)
         up_flow3 = self.upconvflow3(flow3)
-        out_upconv2 = self.upconv2(concat3, training=training)
+        out_upconv2 = self.upconv2(x3_1, training=training)
         concat2 = tf.concat([x2, out_upconv2, up_flow3], axis=-1)
 
         finalflow = self.predict_2(concat2)

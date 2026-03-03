@@ -29,8 +29,10 @@ def load_image_pair(frame1_path, frame2_path, flo_path, image_size=(384, 512), t
 
 def load_flo(flo_path, image_size=(384, 512)):
     raw = tf.io.read_file(flo_path)
-    flow = tf.io.decode_raw(raw, tf.float32)[3:]
-    flow = tf.reshape(flow, [384, 512, 2])
+    data = tf.io.decode_raw(raw, tf.float32)
+    width  = tf.cast(tf.io.decode_raw(raw[4:8],  tf.int32)[0], tf.int32)
+    height = tf.cast(tf.io.decode_raw(raw[8:12], tf.int32)[0], tf.int32)
+    flow = tf.reshape(data[3:], [height, width, 2])
     flow = tf.image.resize(flow, image_size, method='bilinear')
     valid = tf.ones([image_size[0], image_size[1], 1], dtype=tf.float32)
     return flow, valid

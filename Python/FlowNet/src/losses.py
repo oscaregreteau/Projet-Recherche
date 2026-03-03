@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-# while training on kitti
 def epe_loss(flow_pred, flow_gt, valid=None):
     epe = tf.norm(flow_pred - flow_gt, axis=-1)
     if valid is not None:
@@ -10,9 +9,6 @@ def epe_loss(flow_pred, flow_gt, valid=None):
         valid_mask = tf.squeeze(valid_resized, axis=-1) > 0.5
         epe = tf.boolean_mask(epe, valid_mask)
     return tf.reduce_mean(epe)
-
-# def epe_loss(flow_pred, flow_gt):
-#     return tf.reduce_mean(tf.norm(flow_pred - flow_gt, axis=-1))
 
 def multiscale_epe_loss(flow_preds, flow_gt, valid=None, weights=None):
     if weights is None:
@@ -32,7 +28,6 @@ def multiscale_epe_loss(flow_preds, flow_gt, valid=None, weights=None):
 
         scale_h = tf.cast(h, tf.float32) / tf.cast(tf.shape(flow_gt)[1], tf.float32)
         scale_w = tf.cast(w, tf.float32) / tf.cast(tf.shape(flow_gt)[2], tf.float32)
-
         gt_scaled = gt_scaled * tf.stack([scale_w, scale_h])[tf.newaxis, tf.newaxis, tf.newaxis, :]
 
         loss = weight * epe_loss(pred, gt_scaled, valid)

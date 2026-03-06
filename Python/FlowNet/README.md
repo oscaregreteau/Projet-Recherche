@@ -19,9 +19,9 @@ The losses (different scales and validation) will be written in a file called ``
 
 ## Results
 
-After running on the [FlyingChairs Dataset](https://lmb.informatik.uni-freiburg.de/resources/datasets/FlyingChairs.en.html) for 50 epochs, we obtain the following loss curves : 
+After running on the [FlyingChairs Dataset](https://lmb.informatik.uni-freiburg.de/resources/datasets/FlyingChairs.en.html) for 100 epochs, we obtain the following loss curves : 
 
-(insert curves)
 
-This can also be trained on the Kitti Dataset.
+![Total Loss](../../Images/Flownet/total_loss.png)
+
 ## Visualizing the results

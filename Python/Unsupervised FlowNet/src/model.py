@@ -7,14 +7,15 @@ def conv(filters, kernel_size, strides):
             kernel_size=kernel_size,
             strides=strides,
             padding='same',
-            use_bias=False
+            use_bias=False,
+            kernel_initializer='he_normal'
         ),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.ReLU()
     ])
 
 def predict_flow():
-    return tf.keras.layers.Conv2D(filters=2, kernel_size=5, strides=1, padding='same', use_bias=False)
+    return tf.keras.layers.Conv2D(filters=2, kernel_size=5, strides=1, padding='same', use_bias=False,kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.0001))
 
 def upconv(out_channels):
     return tf.keras.Sequential([
@@ -23,7 +24,8 @@ def upconv(out_channels):
             kernel_size=4,
             strides=2,
             padding='same', 
-            use_bias=False
+            use_bias=False,
+            kernel_initializer='he_normal'
         ),
         tf.keras.layers.ReLU()
     ])

@@ -2,7 +2,7 @@
 
 ## Training the model
 
-This runs on Python 3. and requires the following packages :
+This runs on Python 3.11 and requires the following packages :
 ```
 tensorflow
 tqdm
@@ -19,9 +19,17 @@ The losses (different scales and validation) will be written in a file called ``
 
 ## Results
 
-After running on the [FlyingChairs Dataset](https://lmb.informatik.uni-freiburg.de/resources/datasets/FlyingChairs.en.html) for 100 epochs, we obtain the following loss curves : 
+After running on the [FlyingChairs Dataset](https://lmb.informatik.uni-freiburg.de/resources/datasets/FlyingChairs.en.html) for 200 epochs, we obtain the following loss curves : 
 
 
 ![Total Loss](../../Images/Flownet/total_loss.png)
 
 ## Visualizing the results
+
+To visualize the results you can use the Flow Viewer. Results yeald : 
+
+![FlowNet Output on the FlyingChairs dataset](../../Images/Flownet/output.png)
+
+Here is the groundtruth for comparison 
+
+![Groundtruth](../../Images/Flownet/groundtruth.png)

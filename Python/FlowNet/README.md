@@ -28,8 +28,8 @@ After running on the [FlyingChairs Dataset](https://lmb.informatik.uni-freiburg.
 
 To visualize the results you can use the Flow Viewer. Results yeald : 
 
-![FlowNet Output on the FlyingChairs dataset](../../Images/Flownet/output.png)
+FlowNet Output            |  Groundtruth
+:-------------------------:|:-------------------------:
+![](../../Images/Flownet/output.png)  |  ![](../../Images/Flownet/groundtruth.png)
 
-Here is the groundtruth for comparison 
 
-![Groundtruth](../../Images/Flownet/groundtruth.png)

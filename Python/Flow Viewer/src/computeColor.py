@@ -86,7 +86,7 @@ def computeColor(u, v):
 	return img.astype(np.uint8)
 
 
-def computeImg(flow):
+def computeImg(flow, output_path=None):
 
 	eps = sys.float_info.epsilon
 	UNKNOWN_FLOW_THRESH = 1e9
@@ -122,6 +122,11 @@ def computeImg(flow):
 	u = u/(maxrad+eps)
 	v = v/(maxrad+eps)
 	img = computeColor(u, v)
+
+	if output_path is not None:
+		cv2.imwrite(output_path, img)
+		print('Saved flow image to: %s' % output_path)
+
 	return img
 
 if __name__ == '__main__':
@@ -133,15 +138,15 @@ if __name__ == '__main__':
 	  help='Flow file'
 	)
 	parser.add_argument(
-	  '--write',
-	  type=bool,
-	  default=False,
-	  help='write flow as png'
+	  '--output',
+	  type=str,
+	  default=None,
+	  help='Output PNG path (default: same name as flow file with .png extension)'
 	)
-	file = parser.parse_args().flowfile
+
+	args = parser.parse_args()
+	file = args.flowfile
+	output_path = args.output if args.output is not None else file[:-4] + '.png'
+
 	flow = readFlowFile.read(file)
-	img = computeImg(flow)	
-	cv2.imshow(file, img)
-	k = cv2.waitKey()
-	if parser.parse_args().write:
-		cv2.imwrite(file[:-4]+'.png', img)
+	img = computeImg(flow, output_path=output_path)

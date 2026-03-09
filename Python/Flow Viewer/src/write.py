@@ -14,7 +14,7 @@ parser.add_argument('--weights_path', type=str)
 parser.add_argument('--model_path', type=str)
 args = parser.parse_args()
 
-sys.path.append(args.model_path)
+#sys.path.append(args.model_path)
 frame1_path=args.frame1
 frame2_path=args.frame2
 
@@ -36,7 +36,7 @@ model(dummy)
 model.load_weights(args.weights_path)
 
 flows=model(inputs,training=False)
-flow = flows[0][0]
+flow = flows[-1][0]
 
 def write(flow, filename):
 	height, width, nBands = flow.shape

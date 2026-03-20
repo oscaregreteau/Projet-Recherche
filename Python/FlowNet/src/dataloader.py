@@ -65,24 +65,38 @@ def load_flo(flo_path, image_size=(384, 512)):
 #     flow, valid = load_flo(flo_path, image_size)
 #     return frame1, frame2, flow, valid
 
-def get_dataset(data_path, batch_size, image_size=(384, 512), shuffle=True, split='train', val_split=0.2):
-    frame1_dir = os.path.join(data_path)
-    frame2_dir = os.path.join(data_path)
-    flo_dir    = os.path.join(data_path)
+# def get_dataset(data_path, batch_size, image_size=(384, 512), shuffle=True, split='train', val_split=0.2):
+#     frame1_dir = os.path.join(data_path)
+#     frame2_dir = os.path.join(data_path)
+#     flo_dir    = os.path.join(data_path)
 
-    frame1_paths = sorted([
-        os.path.join(frame1_dir, f) for f in os.listdir(frame1_dir)
-        if f.endswith('_img1.ppm')
-    ])
-    frame2_paths = sorted([
-        os.path.join(frame2_dir, f) for f in os.listdir(frame2_dir)
-        if f.endswith('_img2.ppm')
-    ])
-    flo_paths = sorted([
-        os.path.join(flo_dir, f) for f in os.listdir(flo_dir)
-        if f.endswith('_flow.flo')
-    ])
+#     frame1_paths = sorted([
+#         os.path.join(frame1_dir, f) for f in os.listdir(frame1_dir)
+#         if f.endswith('_img1.ppm')
+#     ])
+#     frame2_paths = sorted([
+#         os.path.join(frame2_dir, f) for f in os.listdir(frame2_dir)
+#         if f.endswith('_img2.ppm')
+#     ])
+#     flo_paths = sorted([
+#         os.path.join(flo_dir, f) for f in os.listdir(flo_dir)
+#         if f.endswith('_flow.flo')
+#     ])
     
+def get_dataset(data_path, batch_size, image_size=(384, 512), shuffle=True, split='train', val_split=0.2):
+    frame1_path = os.path.join(data_path, '00001_img1.ppm')
+    frame2_path = os.path.join(data_path, '00001_img2.ppm')
+
+    dataset = tf.data.Dataset.from_tensor_slices(([frame1_path], [frame2_path]))
+    dataset = dataset.map(
+        lambda f1, f2: load_image_pair(f1, f2, image_size),
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.repeat()  # repeat so val/train both work
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    return dataset
+
     #kitti loader
     # frame1_dir = os.path.join(data_path, 'image_2')
     # frame2_dir = os.path.join(data_path, 'image_3')

@@ -55,7 +55,7 @@ for epoch in range(args.epochs):
     epoch_scale_losses = None
     num_batches = 0
 
-    for frame1, frame2, flow_gt, valid in tqdm(train_dataset, desc=f"Epoch {epoch+1}/{args.epochs}"):
+    for frame1, frame2, flow_gt, valid in tqdm(train_dataset.take(1), desc=f"Epoch {epoch+1}/{args.epochs}"):
         loss, scale_losses = train_step(frame1, frame2, flow_gt, valid)
         epoch_loss += loss.numpy()
         if epoch_scale_losses is None:
@@ -70,12 +70,11 @@ for epoch in range(args.epochs):
     log_file.write(train_log_line + "\n")
     log_file.flush()
 
-    # --- Validation ---
     val_loss = 0.0
     val_scale_losses = None
     val_batches = 0
 
-    for frame1, frame2, flow_gt, valid in tqdm(val_dataset, desc=f"Val   {epoch+1}/{args.epochs}"):
+    for frame1, frame2, flow_gt, valid in tqdm(val_dataset.take(1), desc=f"Val   {epoch+1}/{args.epochs}"):
         loss, scale_losses = val_step(frame1, frame2, flow_gt, valid)
         val_loss += loss.numpy()
         if val_scale_losses is None:

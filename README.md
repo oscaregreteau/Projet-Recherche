@@ -8,14 +8,12 @@ Quantifying surface deformation fields is a core problem in solid mechanics and 
 ## Implementations
 
 ### 1. Supervised FlowNet (TensorFlow)
-`Python/FlowNet/`
 
 A TensorFlow implementation of [FlowNet](https://arxiv.org/abs/1504.06852) (Dosovitskiy et al., 2015), an encoder-decoder CNN for optical flow estimation. Trained with a multi-scale EPE loss on the [FlyingChairs dataset](https://lmb.informatik.uni-freiburg.de/resources/datasets/FlyingChairs.en.html).
 
 **Requirements:** Python 3.11, `tensorflow`, `tqdm`, `matplotlib`
 
 ```
-cd Python/FlowNet/src
 python train.py --data_path /your/data/path --epochs 50 --batch_size 8
 ```
 
@@ -24,14 +22,12 @@ Learning rate is fixed at `1e-4`. Weights are saved as `flownet.weights.h5` and 
 
 
 ### 2. Unsupervised FlowNet (TensorFlow)
-`Python/Unsupervised FlowNet/`
 
 An unsupervised variant of FlowNet based on [Yu et al. (ECCV 2016)](https://arxiv.org/abs/1608.05842), combining a photometric consistency loss with a smoothness regularizer — no ground-truth flow required.
 
 **Requirements:** Python 3, `tensorflow`, `tqdm`, `matplotlib`
 
 ```
-cd "Python/Unsupervised FlowNet/src"
 python train.py --data_path /your/data/path --epochs 50 --batch_size 4 --lr 1.6e-5
 ```
 
@@ -40,7 +36,6 @@ Can also be trained on the KITTI dataset. Results were not fully satisfactory; h
 
 
 ### 3. Unsupervised StrainNet (PyTorch)
-`Python/StrainNet Non-Supervisé/`
 
 A PyTorch re-implementation of [StrainNet](https://www.sciencedirect.com/science/article/pii/S0143816620306588) (Boukhtache et al., 2021) adapted for unsupervised training. StrainNet shares the FlowNetS architecture but is tailored for speckle-pattern images used in DIC. Three variants are available: `StrainNet_f`, `StrainNet_h`, and `StrainNet_l`.
 
@@ -53,7 +48,6 @@ The unsupervised loss combines:
 Dataset annotation files (`Train_annotations.csv`, `Test_annotations.csv`) can be generated using the [official StrainNet dataset generator](https://github.com/DreamIP/StrainNet).
 
 ```
-cd "Python/StrainNet Non-Supervisé/src"
 python Train.py --arch StrainNet_f --epochs 300 --batch-size 16
 ```
 
@@ -62,7 +56,6 @@ Checkpoints are saved as `model_best.pth.tar` (best validation EPE) and `checkpo
 
 
 ### 4. Flow Viewer
-`Python/Flow Viewer/`
 
 A visualization utility for optical flow stored in `.flo` files. Inspired by [flow-code-python](https://github.com/Johswald/flow-code-python).
 

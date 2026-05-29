@@ -1,0 +1,662 @@
+\documentclass[aspectratio=169]{beamer}
+
+% ── Encodage / langue ────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[backend=biber, style=authoryear]{biblatex}
+\addbibresource{biblio.bib}
+% ── Maths / figures ──────────────────────────────────────────
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+
+% ============================================================
+% PALETTE SOBRE
+% ============================================================
+\definecolor{Ink}{RGB}{18,24,35}
+\definecolor{Navy}{RGB}{9,39,84}
+\definecolor{Steel}{RGB}{32,88,150}
+\definecolor{Slate}{RGB}{82,96,115}
+\definecolor{Line}{RGB}{204,211,222}
+\definecolor{Fog}{RGB}{244,247,251}
+\definecolor{Pearl}{RGB}{253,253,255}
+\definecolor{Gold}{RGB}{145,105,28}
+\definecolor{Crimson}{RGB}{155,35,45}
+\definecolor{Teal}{RGB}{20,120,105}
+\definecolor{Violet}{RGB}{100,55,155}   % ← ajout : diffusion brownienne
+% Alias pour le bilan
+\colorlet{Good}{Teal}
+\colorlet{Bad}{Crimson}
+\usepackage{eurosym}
+% ============================================================
+% THÈME BEAMER
+% ============================================================
+\usetheme{default}
+\usefonttheme{serif}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{headline}{}
+
+\setbeamercolor{background canvas}{bg=Pearl}
+\setbeamercolor{normal text}{fg=Ink,bg=Pearl}
+\setbeamercolor{frametitle}{fg=Navy,bg=Pearl}
+
+\setbeamerfont{frametitle}{size=\large,series=\bfseries,family=\rmfamily}
+\setbeamerfont{title}{size=\Large,series=\bfseries,family=\rmfamily}
+\setbeamerfont{footnote}{size=\tiny}
+\setbeamercolor{title}{fg=Navy}
+\setbeamertemplate{itemize item}{\small\textcolor{Steel}{\textbullet}}
+\setbeamertemplate{itemize subitem}{\scriptsize\textcolor{Slate}{$\circ$}}
+\setbeamertemplate{enumerate item}{\textcolor{Navy}{\bfseries\insertenumlabel.}}
+
+\setlength{\parskip}{0.15em}
+
+% ── Ligne sous le titre de frame ─────────────────────────────
+\addtobeamertemplate{frametitle}{}{%
+  \vspace{-0.35em}\textcolor{Line}{\rule{\linewidth}{0.5pt}}\vspace{-0.05em}}
+
+% ── Pied de page minimal ─────────────────────────────────────
+\setbeamertemplate{footline}{%
+  \begin{beamercolorbox}[wd=\paperwidth,ht=0.42cm,dp=0.18cm]{footline}
+    \hfill\textcolor{Slate}{\scriptsize\insertframenumber/\inserttotalframenumber}\hspace{0.45cm}
+  \end{beamercolorbox}}
+\setbeamercolor{footline}{bg=Pearl}
+
+% ── Diapo de section ─────────────────────────────────────────
+\AtBeginSection[]{%
+  \begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[Fog] (current page.north west) rectangle (current page.south east);
+    \fill[Navy] (current page.north west) rectangle ++(0.42cm,-\paperheight);
+    \fill[Gold]  ([xshift=0.42cm,yshift=-0.55cm]current page.north west)
+                 rectangle ++(0.12cm,-3.15cm);
+  \end{tikzpicture}
+  \hspace{0.72cm}\begin{minipage}{0.82\textwidth}
+    \vspace{2.2cm}
+    {\color{Slate}\normalsize Partie~\insertsectionnumber}\par
+    \vspace{0.25cm}
+    {\color{Navy}\LARGE\bfseries\insertsectionhead}\par
+    \vspace{0.35cm}
+    {\color{Line}\rule{0.55\linewidth}{0.55pt}}\par
+    \vspace{0.35cm}
+    {\color{Slate}\small\tableofcontents[currentsection,hideallsubsections]}
+  \end{minipage}
+  \end{frame}
+}
+
+% ============================================================
+% COMMANDES MATHÉMATIQUES
+% ============================================================
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\PP}{\mathbb{P}}
+\newcommand{\1}{\mathbf{1}}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+\newcommand{\rsp}{\rho_{\mathrm{sp}}}
+\DeclareMathOperator{\Tr}{Tr}
+
+% ── Notations réseau ─────────────────────────────────────────
+\newcommand{\Cset}{\mathcal{C}}
+\newcommand{\Pset}{\mathcal{P}}
+\newcommand{\nC}{N_c}
+\newcommand{\nP}{N_p}
+\newcommand{\rhobarC}{\bar{\rho}^{C}}
+\newcommand{\rhobarP}{\bar{\rho}^{P}}
+
+% ── Mise en forme typographique ───────────────────────────────
+\newcommand{\key}[1]{\textcolor{Navy}{\textbf{#1}}}
+\newcommand{\kw}[1]{\textcolor{Steel}{\textbf{#1}}}
+\newcommand{\gold}[1]{\textcolor{Gold}{\textbf{#1}}}
+\newcommand{\risk}[1]{\textcolor{Crimson}{\textbf{#1}}}
+\newcommand{\muted}[1]{{\small\color{Slate}#1}}
+\newcommand{\pro}[1]{\textcolor{Teal}{\textbf{#1}}}
+\newcommand{\con}[1]{\textcolor{Crimson}{\textbf{#1}}}
+
+% ── Filets, encadrés ─────────────────────────────────────────
+\newcommand{\sep}{%
+  \vspace{0.15em}\par\textcolor{Line}{\rule{\linewidth}{0.4pt}}\vspace{0.15em}}
+
+\newcommand{\takeaway}[1]{%
+  \vspace{0.25em}\par\noindent
+  \begin{tikzpicture}
+    \node[inner sep=0pt,outer sep=0pt,text width=0.92\linewidth,align=left]
+      (txt) {\small\color{Slate}#1};
+    \draw[Gold,line width=2.2pt]
+      ([xshift=-0.55em]txt.north west)--([xshift=-0.55em]txt.south west);
+  \end{tikzpicture}}
+
+\newcommand{\prosbox}[1]{%
+  \vspace{0.2em}\par\noindent
+  \begin{tikzpicture}
+    \node[inner sep=0pt,outer sep=0pt,text width=0.92\linewidth,align=left]
+      (txt) {\small\color{Slate}#1};
+    \draw[Teal,line width=2.2pt]
+      ([xshift=-0.55em]txt.north west)--([xshift=-0.55em]txt.south west);
+  \end{tikzpicture}}
+
+\newcommand{\consbox}[1]{%
+  \vspace{0.2em}\par\noindent
+  \begin{tikzpicture}
+    \node[inner sep=0pt,outer sep=0pt,text width=0.92\linewidth,align=left]
+      (txt) {\small\color{Slate}#1};
+    \draw[Crimson,line width=2.2pt]
+      ([xshift=-0.55em]txt.north west)--([xshift=-0.55em]txt.south west);
+  \end{tikzpicture}}
+
+% ── Image sécurisée ──────────────────────────────────────────
+\newcommand{\safeimage}[3]{%
+  \IfFileExists{#1}{\includegraphics[width=#2,height=#3,keepaspectratio]{#1}}{%
+    \begin{tikzpicture}
+      \draw[Line,thick,rounded corners=2pt,fill=Fog] (0,0) rectangle (11.2,5.3);
+      \node[align=center,text=Slate] at (5.6,2.65)
+        {Image manquante : \texttt{\detokenize{#1}}\\
+         Placer le fichier dans le même dossier que le \texttt{.tex}};
+    \end{tikzpicture}}}
+
+\title{\Large Apprentissage non-supervisé pour l'estimation de champs de
+déformation à la surface de matériaux soumis à des
+contraintes mécaniques}
+\author{Projet Recherche - Oscar Egreteau}
+\date{Sous la supervision de F.Sur, LORIA}
+% % ── Logos en haut à droite ───────────────────────────────────
+% \newcommand{\logoshautdroit}{%
+%   \begin{tikzpicture}[remember picture,overlay]
+%     \node[anchor=north east, xshift=-0.35cm, yshift=-0.18cm]
+%       at (current page.north east) {%
+%         \includegraphics[height=0.5cm]{Mines(1).png}\hspace{0.15cm}%
+%         \includegraphics[height=0.5cm]{IECL-logo(1).jpg}%
+%       };
+%   \end{tikzpicture}%
+% }
+% \addtobeamertemplate{frametitle}{}{\logoshautdroit}
+
+\usepackage[utf8]{inputenx} % Allows UTF-8 input
+\usepackage[T1]{fontenc}    % Uses T1 font encoding (has proper Euro mapping)
+\usepackage{textcomp}      % Provides the \texteuro command
+\usepackage{marvosym}
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}
+    \frametitle{Sommaire}
+    \tableofcontents
+\end{frame}
+
+\section{Introduction}
+\begin{frame}
+    \frametitle{Introduction}
+    \begin{itemize}
+    \item Analyse du flot optique pour estimer le champ de déformation de matériaux
+    \item Apprentissage non supervisé car difficulté d'avoir une réalité terrain : pas possible de connaître le champ de déformation sur un matériau sans l'utilisation d'une méthode d'estimation numérique.
+\end{itemize}
+% \begin{figure}
+%         \centering 
+%         \includegraphics[height=4cm]{Images/intro.png}
+%         \caption*{Un exemple de champ de déformation}
+%     \end{figure}
+\end{frame}
+
+\section{Flot optique}
+\begin{frame}
+\frametitle{Flot optique}
+    Le flot optique est un champ de vecteurs qui représente le déplacement des pixels entre deux images consécutives. Son calcul repose sur une hypothèse fondamentale, celle de la luminosité constante.\\
+    \begin{figure}[h]
+      \centering
+        \includegraphics[height=4cm]{Images/govas.png}
+        \caption{Deux images consécutives}
+    \end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Flot Optique}
+    \begin{figure}[h]
+      \centering
+        \includegraphics[height=4cm]{Images/output.png}
+        \caption{Flot optique correspondant}
+    \end{figure}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Flot Optique}
+    \framesubtitle{Définition}
+    Le flot optique $\bold{u}=(u_1,u_2)$ est régi par l'équation suivante, obtenue en en dérivant l'hypothèse de la luminosité constante ($\forall t\geq 0, \ I(t,x_1(t),x_2(t))=I_0$) :
+    \begin{align*}
+        \dfrac{\partial I}{\partial t}+\nabla I\cdot \bold{u} &= \dfrac{\partial I}{\partial t}+\dfrac{\partial I}{\partial x}u_1+\dfrac{\partial I}{\partial t}u_2\\
+        &=0
+    \end{align*}
+    Qui est un problème mal posé car les solutions $\bold{u}=(u_1,u_2)$ sont posées sur une droite : il en existe une infinité.
+\end{frame}
+
+\section{Estimation de flot optique par réseaux de neurones}
+\begin{frame}
+\frametitle{Estimation de flot optique par réseaux de neurones}
+\framesubtitle{Introduction}
+    \begin{figure}
+        \includegraphics[width=0.7\textwidth]{Images/Réseaux flot/Général/encodeur.png}
+        \vspace{0.5em}
+        \includegraphics[width=0.7\textwidth]{Images/Réseaux flot/Général/decodeur.png}
+    \end{figure}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Estimation de flot optique par réseaux de neurones}
+    \framesubtitle{Dataset}
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Flying/00001_img1.jpg}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Flying/00001_img2.jpg}
+    \end{minipage}
+    \caption{Un exemple de FlyingChairs}
+\end{figure}
+Le dataset contient $22872$ images différentes.
+\end{frame}
+
+\begin{frame}
+    \frametitle{Estimation de flot optique par réseaux de neurones}
+    \framesubtitle{Dataset}
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Flying/flot.png}
+        \caption{Flot optique correspondant}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Flying/color-scheme.png}
+        \caption{Roue de couleur pour lire le flot}
+    \end{minipage}
+\end{figure}
+\end{frame}
+
+\subsection{Apprentissage supervisé}
+\begin{frame}
+\frametitle{Apprentissage supervisé}
+\framesubtitle{Résultats}
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=7cm]{Images/Réseaux flot/Supervisé/total_loss.png}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage supervisé}
+\framesubtitle{Résultats}
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Réseaux flot/Supervisé/output.png}
+        \caption{Résultat obtenu}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Réseaux flot/Général/groundtruth.png}
+        \caption{Groundtruth correpondante}
+    \end{minipage}
+\end{figure}
+Ces résultats correspondent à ceux du papier
+\end{frame}
+
+\begin{frame}
+\frametitle{Estimation de flot optique par réseaux de neurones}
+\framesubtitle{Résultats}
+Afin d'avoir une métrique de mesure pour qualifier les bons résultats ou non de notre réseau on utilise l'EPE:
+\[ \sum\|V_i^{pred}-V_i^{gt}\|\]
+\begin{itemize}
+  \item EPE pour la méthode supervisée : $\text{EPE} = 3,89\text{ pixels}$
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage supervisé}
+\framesubtitle{Comparaison}
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Réseaux flot/Supervisé/output.png}
+        \caption{Résultat obtenu}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/comptvl.png}
+        \caption{Résultat obtenu avec la méthode TV-L$1$}
+    \end{minipage}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage supervisé}
+\framesubtitle{Comparaison}
+On obtient de plus une différence notable entre les deux, le temps de calcul:
+\begin{itemize}
+  \item Inférence sur le set : instantané ($0.3$s)
+  \pause
+  \item Méthode TV-L$1$ : plutôt de l'ordre de la seconde ($1.2$s)
+\end{itemize}
+Une fois le set entrainé : plus efficace de faire l'inférence.\\
+Mais il faut prendre en compte le temps d'entraînement. 
+\end{frame}
+
+
+
+\subsection{Apprentissage non-supervisé}
+\begin{frame}
+\frametitle{Apprentissage non-supervisé}
+\framesubtitle{Principe}
+    On remplace la loss $AEE$, par une nouvelle loss : 
+    \[\mathcal L(u,v,I(x,y,t),I(x,y,t+1))=\ell_{\text{photometric}}(u,v,I(x,y,t),I(x,y,t+1))\]
+    \[+\lambda \ell_{\text{smoothness}}(u,v)\] 
+    Où : \\
+    \begin{itemize}
+        \item $u,v\in\mathbb R^{H\times W}$  sont les composantes horizontales et verticales du flot prédit.
+        \item $\ell_{\text{photometric}}(u,v,I(x,y,t),I(x,y,t+1))=\displaystyle\sum_{i,j}\rho_D(I(i,j,t)-I(i+u_{i,j},j+v_{i,j},t+1))$
+        \item $\ell_{\text{smoothness}}(u,v)=\displaystyle\sum_{j}^{H}\sum_{i}^{W}(\rho_S(u_{i,j}-u_{i+1,j}) + \rho_S(u_{i,j}-u_{i,j+1})+\rho_S(v_{i,j}-v_{i+1,j}) + \rho_S(v_{i,j}-v_{i,j+1}))$
+    \end{itemize}
+    
+\end{frame}
+
+\begin{frame}
+    \frametitle{Estimation de flot optique par réseaux de neurones}
+    \framesubtitle{Dataset non-supervisé}
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Flying/00001_img1.jpg}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Flying/00001_img2.jpg}
+    \end{minipage}
+    \caption{Un exemple de FlyingChairs}
+\end{figure}
+On garde les deux images consécutives mais on retire le flot réel pour l'entraînement.
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage non-supervisé}
+\framesubtitle{Résultats}
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=7cm]{Images/Réseaux flot/Non Supervisé/loss unsup.png}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage non-supervisé}
+\framesubtitle{Résultats}
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Réseaux flot/Non Supervisé/inf.png}
+        \caption{Résultat obtenu}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=4cm]{Images/Réseaux flot/Général/groundtruth.png}
+        \caption{Groundtruth correpondante}
+    \end{minipage}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Estimation de flot optique par réseaux de neurones}
+\framesubtitle{Résultats}
+Afin d'avoir une métrique de mesure pour qualifier les bons résultats ou non de notre réseau on utilise l'EPE:
+\[ \sum\|V_i^{pred}-V_i^{gt}\|\]
+\begin{itemize}
+  \item EPE pour la méthode non-supervisée : $\text{EPE} = 16,65\text{ pixels}$
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage non-supervisé}
+\framesubtitle{Recherche du problème}
+A la recherche du problème, chacun de ces points ont été explorés :
+\begin{itemize}
+  \item Architecture du réseau
+  \pause
+  \item Pipeline d'importation des images
+  \pause
+  \item Warping
+  \pause
+  \item Loss
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage non-supervisé}
+\framesubtitle{De la difficulté de la reproductibilité des résultats}
+Les résultats du papier sont largement meilleurs, mais de tels résultats sont difficiles à reproduire pour diverses raisons:
+\begin{itemize}
+  \item Difficulté de tester différents hyperparamètres de part la durée d'entraînement
+  \pause
+  \item Détails possiblement non mentionnés dans le papier
+  \pause
+  \item Existence d'un code source, mais avec des dépendances obsolètes
+  \pause
+  \item Aucune mention de la seed initiale
+  \pause
+  \item Coût élevé
+  \begin{itemize}
+    \item Des composants
+    \pause
+    \item De l'électricité
+    \pause
+    \begin{itemize}
+      \item $0,25\cdot0,500\cdot160=20\EUR$
+    \end{itemize}
+  \end{itemize}
+\end{itemize}
+
+
+\end{frame}
+
+\begin{frame}
+\frametitle{Estimation de flot optique par réseaux de neurones}
+\framesubtitle{Conclusion}
+\begin{itemize}
+        \item Meilleurs résultats du supervisé : $\text{EPE} = 3,89$ vs $16,65$ px  sur les grands déplacements du dataset FlyingChairs.
+        \pause
+        \item Limites du non-supervisé :
+        \pause
+        \begin{itemize}
+            \item Sensibilité extrême aux minima locaux de la fonction de coût photométrique.
+            \pause
+            \item Difficulté de convergence sans initialisation ou régularisation particulières.
+            \pause
+        \end{itemize}
+        \item Toutefois les déplacements réels en mécanique des milieux continus sont sub-pixel ou de faible amplitude, on peut espérer que l'apprentissage non-supervisé fonctionnerait.
+    \end{itemize}
+\end{frame}
+
+\section{Estimation de champs de déformation par réseaux de neurones}
+\begin{frame}
+\frametitle{Estimation de champs de déformation par réseaux de neurones}
+\framesubtitle{Introduction}
+
+\begin{itemize}
+        \item Spécificité de la mécanique des matériaux : Les images étudiées présentent des textures de surfaces mouchetées.
+        \pause
+        \item Nature des déplacements : Contrairement au flot optique général, les champs de déformation mécanique ($\varepsilon_{xx}, \varepsilon_{yy}, \varepsilon_{xy}$) :
+        \pause
+        \begin{itemize}
+            \item Sont de très faible amplitude (souvent sub-pixel).
+            \pause
+            \item Présentent de fortes contraintes de continuité spatiale (lois de comportement).
+        \end{itemize}
+        \pause
+        \item Le défi de la vérité terrain : pas d'accès à la groundtruth donc on génère les champs de déplacement par ordinateur de façon analogue à FlyingChairs.
+    \end{itemize}
+\end{frame}
+
+\subsection{Apprentissage supervisé}
+\begin{frame}
+\frametitle{Apprentissage supervisé}
+\framesubtitle{Principe}
+\begin{itemize}
+  \item Même architecture que le FlowNet
+  \item Images synthétiques de surfaces mouchetées, avec des deformations connues
+\end{itemize}
+\begin{figure}[h]
+  \centering
+  \includegraphics[height=4cm]{Images/Réseaux déformations/Sup/Star.png}
+  \caption{Exemple d'une image du dataset}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage supervisé}
+\framesubtitle{Résultats}
+Réseau déjà entrainé disponible
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=2cm]{Images/Réseaux déformations/Sup/StrainNet-l.png}
+        \caption{Déplacement prédit par le réseau}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=2cm]{Images/Réseaux déformations/Sup/Reference.png}
+        \caption{La groundtruth correspondante}
+    \end{minipage}
+\end{figure}
+\begin{itemize}
+  \item Prédiction globalement bonne sauf dans la partie gauche $\longrightarrow$ déplacements à très haute fréquence.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage supervisé}
+\framesubtitle{Comparaison avec le FlowNet supervisé}
+\begin{figure}
+  \centering
+  \includegraphics[height=5cm]{Images/Réseaux déformations/Sup/flownetsup.png}
+  \caption{Déplacement prédit par les poids du FlowNet}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage supervisé}
+\framesubtitle{Comparaison avec le FlowNet supervisé}
+Pistes d'amélioration:
+\begin{itemize}
+  \item Réseau inadapté car a appris sur des formes géométriques
+  \pause
+  \item Finetuning des poids déjà existants
+\end{itemize}
+\end{frame}
+
+\subsection{Apprentissage non-supervisé}
+\begin{frame}
+\frametitle{Apprentissage non-supervisé}
+\framesubtitle{Principe}
+On reprend le principe du FlowNet non supervisé: 
+\begin{itemize}
+  \item On garde l'architecture du réseau
+  \item On remplace la loss par 
+\end{itemize}
+\[\mathcal L(u,v,I(x,y,t),I(x,y,t+1))=\ell_{\text{photometric}}(u,v,I(x,y,t),I(x,y,t+1))\]
+\[+\lambda \ell_{\text{smoothness}}(u,v)\]
+\newline
+$\longrightarrow$ A une chance de fonctionner car les déplacements sont plus petits que sur le set FlyingChairs.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Apprentissage non-supervisé}
+\framesubtitle{Résultats}
+\begin{figure}
+  \includegraphics[height=4.5cm]{Images/Réseaux déformations/Unsup/unsup.png}
+  \caption{Champ de déplacement prédit par le StrainNet non-supervisé}
+\end{figure}
+On obtient de plus une loss constante au cours de l'apprentissage.
+\end{frame}
+
+\begin{frame}
+\frametitle{Apprentissage non-supervisé}
+Il existe certaines pistes d'explication des résultats : 
+\begin{itemize}
+  \item Modification des hyperparamètres (une seule configuration a pu être testée)
+  \pause
+  \item Report des problèmes du FlowNet non-supervisé
+\end{itemize}
+\framesubtitle{Idées d'amélioration}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{Estimation de champs de déformation par réseaux de neurones}
+\framesubtitle{Conclusion}
+\begin{itemize}
+        \item Le réseau StrainNet donne d'excellents résultats globaux sur les surfaces mouchetées, validant l'apprentissage des caractéristiques géométriques du matériau.
+        \pause
+        \item Échec du non-supervisé : Le transfert direct de la loss photométrique du flot optique classique ne fonctionne pas de manière satisfaisante sur ce type de texture :
+        \pause
+        \begin{itemize}
+            \item Le réseau stagne ou génère des champs de déplacement lissés aberrants.
+            \pause
+            \item Les micro-déplacements sub-pixel sont noyés dans le bruit de la loss.
+        \end{itemize}
+        % \item L'absence de régularisation basée sur la physique mécanique empêche le modèle auto-supervisé de converger vers une solution réaliste.
+    \end{itemize}
+\end{frame}
+
+\section{Conclusion et retour sur les objectifs}
+\subsection{Retour sur les objectifs}
+\begin{frame}
+    \frametitle{Retour sur les objectifs}
+    Objectifs fixés au mi-parcours
+    \begin{itemize}
+        \item Implémentation en Python de la méthode d'apprentissage non supervisé du flot optique.
+        \item Application de celle-ci aux matériaux
+    \end{itemize}
+
+\end{frame}
+
+\subsection{Conclusion}
+\begin{frame}
+\frametitle{Conclusion}
+\begin{itemize}
+        \item Apport des réseaux : L'inférence par deep learning offre un gain de temps de calcul considérable par rapport aux méthodes d'optimisation classiques telles que Horn-Schunck par exemple.
+        \item Le verrou de l'auto-supervision : La perte photométrique seule peine à converger sur les textures mouchetées à haute fréquence sans un pré-entraînement supervisé.
+    \end{itemize}
+
+    \sep
+
+    \prosbox{\textbf{Retour sur l'expérience en recherche :}
+    \begin{itemize}
+      \item Opportunité stimulante
+      \item Goût nouveau pour la recherche
+    \end{itemize}}
+\end{frame}
+\begin{frame}[allowframebreaks]
+  \frametitle{Bibliographie}
+  \nocite{*}  % add this before \printbibliography
+  \printbibliography
+\end{frame}
+\end{document}

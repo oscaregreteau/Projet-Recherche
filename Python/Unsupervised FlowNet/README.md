@@ -24,4 +24,5 @@ After running on the [FlyingChairs Dataset](https://lmb.informatik.uni-freiburg.
 (insert curves)
 
 This can also be trained on the Kitti Dataset.
-## Visualizing the results
+
+The results obtained are not what was expected.

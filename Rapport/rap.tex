@@ -2,11 +2,13 @@
 \usepackage[hidelinks]{hyperref}
 \magtex{tex_driver={pdftex},
         tex_packages={xypic, epigraph}}
-\magmisenpage{misenpage_preuve={oui}}
-\maglieudiff{}
-\magprocess
+%\magmisenpage{misenpage_preuve={oui}}
+\geometry{a4paper, hmargin=3.5cm, vmargin=2cm}
+% \maglieudiff{}
+% \magprocess
 \setcounter{tocdepth}{3} 
 \usepackage{tikz}
+\usepackage{microtype}
 \usepackage{amsmath}
 \usepackage{listings}
 \usepackage{xcolor}
@@ -64,7 +66,7 @@
     \end{minipage}\\
 \vspace{2cm}
     \textsc{\LARGE École des Mines de Nancy}\\ \vspace{1cm}
-    \textsc{\LARGE Département Ingénierie Mathématique}\\ \vspace{2cm}
+    \textsc{\LARGE Département Génie Industriel et Mathématiques Appliquées, \\option Ingénierie Mathématique}\\ \vspace{2cm}
 
 
     {\LARGE \textbf{Apprentissage non-supervisé pour l'estimation 
@@ -87,15 +89,25 @@
 \vspace{3cm}
 
 \newpage
-\section{Motivations}
-ecrire des choses
+\section{Introduction}
 
+L'analyse expérimentale des matériaux soumis à des contraintes mécaniques est un enjeu central en mécanique des solides et en science des matériaux. Lorsqu'un matériau est soumis à une charge, il se déforme localement de façon hétérogène : quantifier précisément ces champs de déformation à sa surface est indispensable pour comprendre son comportement, détecter des zones de fragilité et prévenir des ruptures.
+
+Le problème d'estimation de champs de déplacement entre deux images d'une surface présente des similarités profondes avec celui du flot optique, largement étudié en vision par ordinateur. Le flot optique vise à estimer le mouvement apparent de chaque pixel d'une image à la suivante, et des méthodes classiques telles que Horn-Schunck ou Lucas-Kanade, ainsi que des approches par apprentissage profond comme le FlowNet ont été développées dans ce cadre. Ces méthodes constituent un point de départ naturel pour aborder l'estimation de champs de déformation en mécanique.
+
+Ce rapport s'inscrit dans cette direction. L'objectif est d'explorer dans quelle mesure des méthodes d'apprentissage non supervisé, s'appuyant sur des architectures de réseaux de neurones convolutifs inspirées du flot optique, peuvent être adaptées à l'estimation de champs de déformation à la surface de matériaux texturés. L'apprentissage non supervisé présente un intérêt particulier dans ce contexte : contrairement à l'apprentissage supervisé, il ne nécessite pas de disposer de données labellisées, c'est-à-dire de paires d'images accompagnées du champ de déplacement réel qui sont difficiles à obtenir expérimentalement en dehors de simulations numériques.
+
+On commencera par rappeler les fondements théoriques du flot optique et les méthodes classiques associées, avant de présenter les architectures de réseaux de neurones utilisées. On s'intéressera ensuite à l'adaptation de ces approches au cas spécifique des matériaux via le modèle StrainNet, et on explorera des stratégies d'apprentissage non supervisé pour ce problème.
+
+\vspace{1cm}
+
+Je tiens à remercier Frédéric Sur pour son expertise, sa disponibilité et son aide précieuse tout au long de ce projet, sans lesquelles ce travail n'aurait pas pu aboutir. Je remercie également le Techlab pour la mise à disposition de l'équipement informatique nécessaire à l'entraînement des réseaux de neurones, dont les temps de calcul importants auraient autrement constitué un gros obstacle. Enfin, je remercie l'École des Mines de Nancy pour l'existence du projet recherche, qui offre aux étudiants la chance de se confronter concrètement au monde de la recherche scientifique dès leur formation.
 
 \section{Flot Optique}
 \subsection{Introduction}
-%\cite{flow}
+Le flot optique \cite{flow} est un concept de la vision par ordinateur qui consiste à décrire le mouvement apparent des objets dans une image ou une vidéo. Plus précisément, il s'agit d'estimer comment chaque pixel de l'image se déplace d'une image à la suivante, en observant les variations de luminosité au cours du temps. Intuitivement, le flot optique permet à un ordinateur de “voir” le mouvement, un peu comme notre cerveau perçoit le déplacement des objets lorsque nous regardons une scène en mouvement. C'est un problème fondamental en vision par ordinateur, utilisé notamment pour le suivi d'objets ou la détection de mouvements.
 \subsubsection{Hypothèse pour le Flot Optique}
-L'hypothèse la plus importante qui sert dans la détermination du flot optique est celle de l'illumination constante. Elle suppose que le triplet $\p{X_1(t),X_2(t),X_3(t)}$, représenté par le couple $\p{x_1(t),x_2(t)}$ dans le plan de la caméra a une luminosité qui ne dépend pas du temps : $I(t,x_1(t),x_2(t)=I_0, \ \forall t\geq 0$.
+L'hypothèse centrale utilisée pour estimer le flot optique est celle de l'illumination constante. Elle suppose que le triplet $\p{X_1(t),X_2(t),X_3(t)}$ (coordonnées 3D d'un point réel de la scène à l'instant $t$ exprimées dans le repère du monde), représenté par le couple $\p{x_1(t),x_2(t)}$ dans le plan de la caméra a une luminosité qui ne dépend pas du temps : $I(t,x_1(t),x_2(t))=I_0, \ \forall t\geq 0$, où $I$ est la frame $t$ d'une vidéo, aux coordonnées $\p{x_1(t),x_2(t)}$.
 
 \subsubsection{Établissemement de l'équation du Flot Optique}
 On suppose donc ici que l'illumination d'un point au temps $t$ reste constante.
@@ -108,7 +120,7 @@ D'après la formule de dérivation des fonctions composées, on obtient :
     \displaystyle\derd{}{t}\p{I(t,x_1(t),x_2(t))}&= \parfrac{}{t}I(t,x_1(t),x_2(t))+\derd{x_1}{t}\parfrac{}{x_1}I(t,x_1(t),x_2(t))+\derd{x_2}{t}\parfrac{}{x_2}I(t,x_1(t),x_2(t))\\
      &=\parfrac{}{t}I(t,x_1(t),x_2(t)) + \nabla I\cdot v
 \end{align*}
-avec $v:=\p{\displaystyle\derd{x_2}{t},\displaystyle\derd{x_2}{t}}$\\
+avec $v:=\p{\displaystyle\derd{x_1}{t},\displaystyle\derd{x_2}{t}}$, $\cdot$ le produit scalaire euclidien et $\nabla$ le gradient en coordonnées cartésiennes.\\
 
 Finalement, on obtient donc l'équation du flot optique, pour laquelle on cherche $v$ :
 \[ \parfrac{I}{t}+\nabla I\cdot v =0\]
@@ -121,25 +133,23 @@ est une équation à deux inconnues, $\displaystyle\derd{x_1}{t}$ et $\displayst
 \subsection{Estimation du flot optique}
 
 \subsubsection{Méthode de Horn-Schunck}
-\cite{horn}
-La première méthode qui permet l'estimation du flot optique consiste à ajouter une contrainte supplémentaire, celle visant à avoir un champ assez lisse.
-En notant $u:=\displaystyle\derd{x_1}{t}$ et $v:=\displaystyle\derd{x_2}{t}$, on a que $\nabla u=\p{\displaystyle\parfrac{u}{x_1},\displaystyle\parfrac{u}{x_2}}.$ Le premier terme représente la variation de $u$ dans la direction $x$ et le deuxième la variation dans la direction $y$.\\
+La première méthode est une méthode globale \cite{horn} qui permet l'estimation du flot optique consiste à ajouter une contrainte supplémentaire qui nécessaire pour lever l'indétermination soulignée dans le problème de l'ouverture, celle visant à avoir un champ assez lisse.
+En gardant $v:=\p{\displaystyle\derd{x_1}{t},\displaystyle\derd{x_2}{t}}$, on a que $\nabla u=\p{\displaystyle\parfrac{u}{x_1},\displaystyle\parfrac{u}{x_2}}.$ Le premier terme représente la variation de $u$ dans la direction $x$ et le deuxième la variation dans la direction $y$.\\
 Horn et Schunck introduisent donc une fonctionnelle à minimiser :
 \[\displaystyle\iint\p{\parfrac{I}{t}+\nabla I\cdot (u,v)}^2 \textrm{d}x\textrm{d}y\]
 Qui revient à trouver un couple $(u,v)$ qui résoud l'équation du flot optique, car le minimum de celle-ci est $0$, atteint pour les couples qui vérifient l'équation.\\
 On ajoute de plus une fonctionnelle traduisant la contrainte de régularité, que l'on va également chercher à minimiser.
 \[ \lambda\iint\|\Delta(u,v)\|^2 \textrm{d}x\textrm{d}y \] 
-où $\lambda$ est un paramètre strictement positif 
+où $\lambda$ est un paramètre strictement positif, et où $\Delta$ représente le laplacien.
 
 Ainsi, la méthode Horn-Schunck consiste en la minimisation de la fonctionnelle qui correspond à la somme des deux précédentes, c'est-à-dire
 \[E(u,v):=\displaystyle\iint\p{\parfrac{I}{t}+\nabla I\cdot (u,v)}^2 \textrm{d}x\textrm{d}y + \lambda\iint\|\Delta(u,v)\|^2 \textrm{d}x\textrm{d}y \]
 $E$ est positive en tant que somme de carrés et par positivité de l'intégrale. \\
-Un des désavantages de cette méthode est qu'elle ne peut être utilisée que pour mesurer des déplacements importants, car la regularité imposée implique que l'on ne peut pas mesurer les petites variations locales car se font régulariser.
+Un des désavantages de cette méthode est qu'elle ne peut être utilisée que pour mesurer des déplacements importants, car la regularité imposée implique que l'on ne peut pas mesurer les petites variations locales car celles-ci se font régulariser.
 
 
 \subsubsection{Méthode de Lucas-Kanade}
-\cite{lucas}
-Deuxièmement, on peut estimer le flot optique via une deuxième méthode, celle de Lucas-Kanade. Elle suppose quant à elle que le déplacement d'un point de l'image entre deux instants consécutifs est petit et approximativement constant dans un voisinage du point $p$. On note $(u,v)$ le vecteur des vitesses locales autour de ce point $p$. En supposant qu'il y a $n$ pixels dans cette fenêtre et que l'on les nomme $\p{q_1,\dots,q_n}$, $u$ et $v$ doivent vérifier le système suivant : 
+Deuxièmement, on peut estimer le flot optique via une deuxième méthode, cette fois locale \cite{lucas}, celle de Lucas-Kanade. Elle suppose quant à elle que le déplacement d'un point de l'image entre deux instants consécutifs est petit et approximativement constant dans un voisinage du point $p$. On note $(u,v)$ le vecteur des vitesses locales autour de ce point $p$. En supposant qu'il y a $n$ pixels dans cette fenêtre et que l'on les nomme $\p{q_1,\dots,q_n}$, $u$ et $v$ doivent vérifier le système suivant car la même inconnue $(u,v)$ est valable pour plusieurs $q_i$ en raison du faible déplacement.
 \[
 \begin{cases}
 \parfrac{I}{x}(q_1)u + \parfrac{I}{y}(q_1)v = -\parfrac{I}{t}(q_1) \\
@@ -169,15 +179,15 @@ v
 \frac{\partial I}{\partial t}(q_n)
 \end{pmatrix}
 \]
-Soit de la forme $Ax=b$. De plus $x$ est solution s'il minimise $\|Ax-b \|_2 = \min\ens{ Ay-b, y\in\R^2}$ et on retrouve là un problème de moindre carrés.
+Soit de la forme $Ax=b$. De plus $x$ est solution s'il minimise $\|Ax-b \|_2 = \min\ens{ \|Ay-b\|, y\in\R^2}$ et on retrouve là un problème de moindre carrés.
 
 
 \subsection{Méthodes Numériques}
 \subsubsection{OpenCV}
-OpenCV (pour Open Source Computer Vision Library) est une bibliothèque Python spécialisée dans le traitement d'images en temps réel. Ses utilisations sont très diverses, et vont de la lecture et du traitement d'une image jusqu'au calcul du flot optique entre 2 frames, ceci étant ce qui nous interesse particulièrement.
+OpenCV (pour Open Source Computer Vision Library) est une bibliothèque Python spécialisée dans le traitement d'images en temps réel. Ses utilisations sont très diverses, et vont de la lecture et du traitement d'une image jusqu'au calcul du flot optique entre 2 trames par exemple, ceci étant ce qui nous interesse particulièrement.
 \subsubsection{Méthode TV-L1}
-\cite{tvl}
-La méthode TV-L1 est une méthode qui se base sur la minimisation de la fonctionnelle suivante :
+
+La méthode TV-L1 \cite{tvl} est une méthode qui se base sur la minimisation de la fonctionnelle suivante :
 \[ E(u)=\int_\Omega\left( \left| \nabla u_1 \right|+\left| \nabla u_2\right|+ \lambda\left| \rho(u)\right|\right)\]
 Où :
 \begin{itemize}
@@ -205,7 +215,7 @@ L'execution du programme nous renvoit toutefois
 \begin{center}
     \includegraphics[height=5cm]{Images/flot/output.png}
 \end{center}
-Ceci est assez cohérent. En effet, on voit certaines flèches qui ne vont pas dans le sens attendu, ce qui est dû à l'hypothèse faite sur la constance de l'illumination, qui n'est pas vérifiée dans la réalité. De plus, les véhicules du fond ne forment pas de flèche car ne semblent pas bouger, en raison de l'effet parallaxe qui est un effet visuel dans lequel les éléments les plus proches du viewer se déplacent plus rapidement que ceux situés en arrière-plan.\\
+Ceci est assez cohérent. En effet, on voit certaines flèches qui ne vont pas dans le sens attendu, ce qui est dû à l'hypothèse faite sur la constance de l'illumination, qui n'est pas vérifiée dans la réalité. De plus, les véhicules du fond ne forment pas de flèche car ne semblent pas bouger, en raison de l'effet parallaxe qui est un effet visuel dans lequel les éléments les plus proches de l'observateur se déplacent plus rapidement que ceux situés en arrière-plan.\\
 
 Essayons à présent de changer les paramètres. On fait varier successivement $\lambda$ et $\theta$
 
@@ -382,21 +392,52 @@ L'execution du programme précédent donne quant à elle :
 Les réseaux de neurones classiques reposent sur le modèle du Perceptron \cite{cours}. Ce dernier, développé par F. Rosenblatt est un classificateur biclasse. Il prend en entrée $d$ valeurs scalaires $\p{x_1,\dots,x_d}$ et renvoie $+1$ si $w_0+x_1w_1+\cdots+x_dw_d>0$ et $-1$ sinon. Les $w_i$ sont les paramètres du modèle. 
 \begin{figure}[H]
     \centering
-    \includegraphics[height=3.5cm]{Images/Flying/flot.png}
+    \includegraphics[height=3.5cm]{Images/Single-Perceptron-by-Frank-Rosenblatt-2697322670.png}
     \caption{Le perceptron de Rosenblatt}
 \end{figure}
 
 Un réseau de neurones est une composition de neurones formels, inspirés du perceptron de Rosenblatt, organisés en plusieurs couches. La présence de couches cachées et de fonctions d'activation non linéaires permet d'apprendre des fonctions non linéaires, contrairement au perceptron, dont la fonction d'activation est une fonction de seuil.
 
 \subsubsection{Les ConvNet}
+
+Les réseaux de neurones convolutifs sont une classe particulière de réseaux de neurones spécialement conçue pour le traitement des données structurées sous forme de grilles, comme les images. Contrairement aux réseaux entièrement connectés, les ConvNet exploitent la structure spatiale des images en utilisant des opérations de convolution locales.
+
+Une couche convolutive applique un ensemble de filtres (ou noyaux) de petite taille qui parcourent l'image d'entrée afin d'extraire des caractéristiques locales telles que des contours, des textures ou des motifs plus complexes. Chaque filtre est partagé spatialement, ce qui réduit fortement le nombre de paramètres à apprendre et confère au réseau une certaine invariance par translation.
+
+Mathématiquement, si $I \in \mathbb{R}^{H \times W \times C}$ désigne une image d'entrée et $K$ un filtre convolutif, l'opération de convolution produit une carte de caractéristiques donnée par :
+\[
+(I * K)(x,y) = \sum_{i,j,c} I(x+i,y+j,c)\,K(i,j,c)
+\]
+
+Les ConvNet sont généralement constitués d'une alternance de couches convolutives, de fonctions d'activation non linéaires (comme ReLU), et parfois de couches de sous-échantillonnage (pooling). À mesure que l'on progresse dans les couches, les caractéristiques apprises deviennent de plus en plus abstraites, passant de motifs locaux simples à des structures globales plus complexes.
+
+Dans le cadre de l'estimation du flot optique, les ConvNet sont particulièrement adaptés car ils permettent de capturer des corrélations spatiales et temporelles entre deux images consécutives, tout en restant robustes au bruit et aux variations locales d'illumination.
+
+
 \subsubsection{Les U-Net}
-\cite{unet}
+L'architecture U-Net \cite{unet} est un type particulier de réseau convolutif initialement développé pour la segmentation d'images biomédicales, mais qui s'est depuis imposé comme une architecture de référence pour de nombreuses tâches de prédiction dense, telles que l'estimation du flot optique ou des cartes de profondeur.
+
+Le U-Net repose sur une architecture symétrique en forme de « U », composée de deux parties principales :
+\begin{itemize}
+    \item une partie encodeur, qui extrait progressivement des caractéristiques de plus en plus abstraites en réduisant la résolution spatiale ;
+    \item une partie décodeur, qui reconstruit une sortie à haute résolution à partir de ces caractéristiques.
+\end{itemize}
+
+Une caractéristique essentielle du U-Net est la présence de \emph{skip connections} entre les couches de l'encodeur et celles du décodeur à résolution équivalente. Ces connexions permettent de réinjecter des informations spatiales fines perdues lors du sous-échantillonnage, améliorant ainsi la précision de la reconstruction finale.
+
+Dans le cas de l'estimation du flot optique, le U-Net est particulièrement bien adapté car il permet de combiner :
+\begin{itemize}
+    \item une compréhension globale du mouvement grâce aux couches profondes ;
+    \item une localisation précise des déplacements via les connexions directes entre encodeur et décodeur.
+\end{itemize}
+
+Ainsi, le réseau peut produire un champ de flot dense, c'est-à-dire une prédiction du vecteur déplacement pour chaque pixel de l'image. Cette architecture constitue la base de nombreux modèles modernes de flot optique, notamment FlowNet, qui adapte le U-Net pour traiter en entrée deux images consécutives et produire en sortie un champ de vitesses bidimensionnel.
 \subsection{Estimation de Flot Optique par apprentissage supervisé}
 \subsubsection{L'architecture FlowNet}
 Le FlowNet \cite{fn} est un réseau de neurones qui permet de calculer de manière supervisé le flot optique entre deux images consécutives. Ce dernier se base sur l'architecture U-Net décrite précédemment, et l'architecture est la suivante.
     \begin{figure}[H]
         \centering
-        \includegraphics[height=4.3cm]{Images/FlowNet/encodeur.png}
+        \includegraphics[height=3.1cm]{Images/FlowNet/encodeur.png}
         \caption{La partie encodeur}
     \end{figure}
     \begin{figure}[H]
@@ -412,17 +453,8 @@ où $F:=(u,v)$ désigne le flot optique estimé et $F_{\text{gt}}:=(u_{\text{gt}
 
 
 \subsubsection{Modèle simplifié}
-Pour des raisons de simplicité, on implémente plutôt le modèle FlowNetS, qui garde le même principe mais simplifie la partie encodeur du U-Net, tout en gardant le même décodeur et la même loss.
-\begin{figure}[H]
-        \centering
-        \includegraphics[height=3.1cm]{Images/FlowNet/encodeur.png}
-        \caption{La partie encodeur du réseau FlowNetS}
-    \end{figure}
-De plus, en raison de contraintes informatiques, on ne garde que dans un premier temps $3$ couches convolutives et $3$ couches déconvolutives sur le même principe que le FlowNetS, pour accélérer l'entraînement.
-% \begin{figure}[h]
-%     \includegraphics{flownet perso}
-%     \caption{Le modèle FlowNet à $3$ couches}  
-% \end{figure}
+Afin de vérifier si le réseau fonctionne correctement, on implémente tout d'abord un modèle avec seulement $3$ couches, afin de pouvoir l'entraîner directement sur une machine moins puissante, pour pouvoir ensuite le lancer pour un entraînement complet sur une machine ayant la puissance necessaire.\\
+On obtient alors $1 329 316$ paramètres contre $26 600 608$, rendant l'entrainement nettement plus rapide.
 \subsubsection{Limites de l'apprentissage supervisé}
 Pour estimer le flot optique via un réseau neuronal convolutif en apprentissage supervisé, il est nécessaire d'avoir non seulement les deux images successives, mais aussi la réalité, c'est-à-dire le veritable flot optique entre les deux images. Comme on ne peut pas obtenir celui-ci pour des images quelconques, il est donc nécessaire de générer des images par ordinateur pour obtenir le véritable flot optique correspondant. On entraîne donc notre réseau de neurones sur le dataset FlyingChairs \cite{DFIB15}. Il est constitué de $22872$ paires d'images avec pour chaque paire le flot optique correspondant.
 
@@ -460,72 +492,42 @@ Donc dans l'image précédente; la chaise en bas à droite se dirige dans la dir
 
 
 \subsubsection{Résultats}
-Après un entraînement de $15$ epochs, sur le set FlyingChairs, on obtient la courbe de loss suivante.
+Après un entraînement de $200$ epochs, sur le set FlyingChairs, on obtient la courbe de loss suivante.
 \begin{figure}[H]
     \centering
-\begin{tikzpicture}
-\begin{axis}[
-    % title={Courbe de Loss en fonction des epochs},
-    xlabel={Epochs},
-    ylabel={Loss},
-    xmin=1, xmax=15,
-    ymin=0.01, ymax=0.0175,
-    xtick={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15},
-    ytick={0.01,0.0125,0.015,0.0175,0.02},
-    legend pos=north east,
-    ymajorgrids=true,
-    xmajorgrids=true,
-    grid style=dashed
-]
-
-\addplot[
-    color=red,
-    mark=x,
-    ]
-    coordinates {
-    (1,0.0146)(2,0.0142)(3,0.0162)(4,0.0130)(5,0.0130)(6,0.0130)(7,0.0123)(8,0.0130)(9,0.0118)(10,0.0128)(11,0.0130)(12,0.0149)(13,0.0125)(14,0.0110)(15,0.0135)
-    };
-    \addlegendentry{Validation Loss}
-    
-\addplot[
-    color=blue,
-    mark=x,
-    ]
-    coordinates {
-    (1,0.0148)(2,0.0144)(3,0.0139)(4,0.0138)(5,0.0133)(6,0.0129)(7,0.0127)(8,0.0127)(9,0.0126)(10,0.0126)(11,0.0124)(12,0.0125)(13,0.0124)(14,0.0123)(15,0.0123)
-    };
-    \addlegendentry{Loss}    
-\end{axis}
-\end{tikzpicture}
-\caption{Courbe de Loss en fonction des epochs}
+    \includegraphics[height=5cm]{Images/FlowNet/total_loss.png}
+    \caption{Courbe de Loss en fonction des epochs}
 \end{figure}
 
-On constate que la loss décroit, ce qui nous confirme que le réseau a bien appris lors de ces epochs. Toutefois ces résultats sont moyennement satisfaisants, car la decroissance de la loss n'est que d'environ $20\%$ et la validation loss ne croit qu'en pics. On peut toutefois observer sur les images que les résultats nous permettent d'identifier du mouvement et la direction globale, mais la position reste assez floue. On constate aussi que quelques erreurs sont générées : sur le premier exemple on observe une tâche jaune non présente dans la groundtruth.
+
+On constate que la loss décroit, ce qui nous confirme que le réseau a bien appris lors de ces epochs. De plus, la loss de validation décroit également nous indiquant que l'on n'est pas en situation de sur-apprentissage. Lors de l'inférence sur différentes images du set, on obtient de très bons résultats, proches de la groundtruth, bien qu'il reste un peu de bruit on garde les directions globales.
 \begin{figure}[H]
     \centering
     \begin{minipage}{0.45\textwidth}
         \centering
-        \includegraphics[height=6cm]{Images/FlowNet/flownet_visualization_00001.png}
-        \caption{Un premier exemple}
+        \includegraphics[height=5cm]{Images/FlowNet/output.png}
+        \caption{Flot prédit par le réseau}
     \end{minipage}
     \hfill
     \begin{minipage}{0.45\textwidth}
         \centering
-        \includegraphics[height=6cm]{Images/FlowNet/flownet_visualization_20000.png}
-        \caption{Un deuxième exemple}
+        \includegraphics[height=5cm]{Images/FlowNet/groundtruth.png}
+        \caption{La groundtruth correspondante}
     \end{minipage}
 \end{figure}
+
 
 \subsubsection{Comparaison avec la méthode TV-L1}
 On applique la méthode TV-L1 précédente sur les images du set Flying Chairs, pour voir si cela correspond.
 \begin{figure}[H]
     \centering
-    \includegraphics[height=6cm]{Images/FlowNet/comptvl.png}
+    \includegraphics[height=5cm]{Images/FlowNet/comptvl.png}
     \caption{Méthode TV-L$1$ appliquée sur une image du set FlyingChairs}
 \end{figure}
+On observe que les directions globales coïncident, mais que cette version a du bruit dans des sections qui ne sont pas censées bouger.
 \subsection{Estimation de Flot Optique par apprentissage non-supervisé}
 \subsubsection{Motivations}
-En vue de ce qui a été expliqué précédemment, notamment à propos de la difficulté d'obtenir des images avec le flot optique sans les générer par ordinateur, on s'interrese donc à l'estimation de flot optique par apprentissage non-supervisé, contrairement à ce qui a été fait précédemment.
+En vue de ce qui a été expliqué précédemment, notamment à propos de la difficulté d'obtenir des images avec le flot optique sans les générer par ordinateur, on s'interresse donc à l'estimation de flot optique par apprentissage non-supervisé, contrairement à ce qui a été fait précédemment.
 
 \subsubsection{Approche technique}
 Le principe \cite{basics} pour calculer le flot par apprentissage non-supervisé est de garder l'architecture présentée plus haut du FlowNet Simple, mais d'adapter la loss : 
@@ -547,477 +549,136 @@ On choisit en particulier, comme proposé par le papier pour l'entrainement sur 
 
 \subsubsection{Résultats}
 
-Après un premier entrainement du modèle complet sur une durée de $5$ epochs, on obtient la courbe de loss suivante :
+Après un premier entrainement du modèle complet sur une durée de $500$ epochs, on obtient la courbe de loss suivante :
 
 
 \begin{figure}[H]
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-    xlabel={Epochs},
-    ylabel={Loss},
-    xmin=1, xmax=5,
-    ymin=0.20, ymax=0.27,
-    xtick={1,2,3,4,5},
-    ytick={0.20,0.21,0.22,0.23,0.24,0.25,0.26,0.27},
-    legend pos=north east,
-    ymajorgrids=true,
-    xmajorgrids=true,
-    grid style=dashed,
-    clip=false,
-    legend style={
-        at={(1.05,0.5)},
-        anchor=west,
-        font=\scriptsize
-    },
-    legend columns=1,
-]
+    \centering
+    \includegraphics[height=5cm]{Images/unsup/loss unsup.png}
+    \caption{Courbe de Loss en fonction des epochs}
+\end{figure}
+En particulier, la learning rate de départ est définie à $10^{-3}$, et est divisée par $2$ toutes les $50$ itérations. On a de plus choisi $\lambda=0.01$ après des premiers entraînements infructueux avec la valeur de $\lambda$ mentionnée dans l'article.\\
+On observe que la loss décroit bien, nous indiquant que le modèle apprend bien. On peut donc faire l'inférence sur la même paire d'images que précédemment.
 
-\addplot[
-    color=red,
-    mark=x,
-]
-coordinates {
-    (1,0.233782)
-    (2,0.210339)
-    (3,0.210068)
-    (4,0.209948)
-    (5,0.210539)
-};
-\addlegendentry{Loss}
-
-\addplot[
-    color=blue,
-    mark=x,
-]
-coordinates {
-    (1,0.233465)
-    (2,0.206417)
-    (3,0.205887)
-    (4,0.205839)
-    (5,0.206415)
-};
-\addlegendentry{Loss prédite 1}
-
-\addplot[
-    color=green,
-    mark=x,
-]
-coordinates {
-    (1,0.240945)
-    (2,0.208765)
-    (3,0.208457)
-    (4,0.208374)
-    (5,0.209023)
-};
-\addlegendentry{Loss prédite 2}
-
-\addplot[
-    color=orange,
-    mark=x,
-]
-coordinates {
-    (1,0.220272)
-    (2,0.210305)
-    (3,0.210515)
-    (4,0.210089)
-    (5,0.210734)
-};
-\addlegendentry{Loss prédite 3}
-
-\addplot[
-    color=yellow,
-    mark=x,
-]
-coordinates {
-    (1,0.222609)
-    (2,0.216380)
-    (3,0.216345)
-    (4,0.216265)
-    (5,0.217004)
-};
-\addlegendentry{Loss prédite 4}
-
-\addplot[
-    color=brown,
-    mark=x,
-]
-coordinates {
-    (1,0.233668)
-    (2,0.229168)
-    (3,0.229430)
-    (4,0.229241)
-    (5,0.229747)
-};
-\addlegendentry{Loss prédite 5}
-
-\addplot[
-    color=pink,
-    mark=x,
-]
-coordinates {
-    (1,0.258055)
-    (2,0.254924)
-    (3,0.256142)
-    (4,0.255799)
-    (5,0.255723)
-};
-\addlegendentry{Loss prédite 6}
-
-\end{axis}
-\end{tikzpicture}
-\caption{Loss en fonction des epochs, avec l'optimiseur Adam}
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=5cm]{Images/unsup/flow_colorwheel.png}
+        \caption{Flot prédit par le réseau}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=5cm]{Images/FlowNet/groundtruth.png}
+        \caption{La groundtruth correspondante}
+    \end{minipage}
 \end{figure}
 
-Où l'on a \verb#loss = 1/2 loss1 + 1/4 loss2 + 1/8 loss3 + 1/16 loss4 + 1/32 loss5 + 1/32 loss6#.
+Les résultats obtenus sont très décevants : le flot prédit ne présente aucune ressemblance avec la vérité terrain, ni en termes de directions ni d'intensités. Afin de remédier à ce problème, de nombreuses pistes ont été explorées : changement d'architecture du modèle, modification de la stratégie de warping, ainsi qu'une modification de hyperparamètre $\lambda$, mais aussi du taux d'apprentissage et de la taille des batchs. Malgré ces tentatives, il n'a pas été possible de reproduire les résultats annoncés dans l'article de référence \cite{basics}. L'origine de cet écart reste à ce stade inexpliquée : il pourrait s'agir de détails d'implémentation non précisés dans le papier, de différences dans le prétraitement des données, ou encore de subtilités liées à l'initialisation ou à l'optimisation. \\
+Par ailleurs, bien qu'un code source associé à l'article soit disponible publiquement, celui-ci ne s'est pas révélé directement utilisable en l'état : des dépendances obsolètes, des différences de versions de bibliothèques et un manque de documentation ont rendu sa réutilisation impossible sans modifications substantielles. Ce problème de reproductibilité est malheureusement courant dans la littérature en apprentissage profond, où les résultats publiés dépendent souvent de détails d'implémentation qui ne sont pas explicitement documentés. De plus, il a été tenté de modifier plus les hyperparamètres que seulement le $\lambda$, mais sans succès, notamment car l'entraînement du réseau est long (environ $150$ heures pour $500$ epochs) et donc on ne peut pas faire beaucoup d'entraînements successifs pour trouver la bonne valeur des hyperparamètres empiriquement. À cela s'ajoute une contrainte financière non négligeable : chaque entraînement complet représente un coût d'environ $20$ euros en ressources de calcul, ce qui limite drastiquement le nombre d'expériences qu'il est raisonnable de mener et rend d'autant plus difficile une exploration systématique des hyperparamètres.\\
+En effet, en estimant le prix de l'electricité lors de mon projet à $0,25$ euros par KWh, et une puissance de l'ordinateur à $500$ Watts, on obtient un prix d'entraînement de $0,125$ euros par heure, d'où $20$ euros pour $160$ heures.
 
-\subsubsection{Comparaison avec la méthode supervisée}
+\subsection{Comparaison quantitative des approches supervisée et non-supervisée}
+
+Afin d'évaluer de manière objective les performances des architectures implémentées pour l'estimation du flot optique sur le jeu de données FlyingChairs, nous comparons ici les résultats quantitatifs obtenus par les deux types d'entraînement. D'un côté, l'approche supervisée s'appuie sur un modèle de type FlowNetS simplifié optimisé via la perte AEE ; de l'autre, l'approche non-supervisée exploite une combinaison de perte photométrique et de régularisation de Charbonnier. 
+
+Le critère d'évaluation retenu est l'erreur de point final moyenne (Average End-Point Error ou EPE) exprimée en pixels. Pour la méthode non-supervisée, l'évaluation donne une EPE de 16,6519 pixels. À l'inverse, l'approche supervisée atteint une EPE nettement inférieure de 3,8931 pixels.
+
+\subsubsection{Analyse des résultats}
+
+L'analyse de ces métriques met en évidence un écart de performance majeur qui s'explique par les mécanismes profonds de chaque mode d'apprentissage :
+
+\begin{itemize}
+    \item Approche supervisée : Elle surpasse très nettement la méthode non-supervisée, avec une EPE environ quatre fois plus faible. Ce résultat confirme que la présence d'une vérité terrain explicite (groundtruth) fournit un signal de gradient fort, stable et direct. Cela permet aux filtres convolutifs de l'encodeur de capturer efficacement les corrélations de mouvement complexes et de résoudre les déplacements à grande amplitude.
+    
+    \item Approche non-supervisée : L'EPE élevée obtenue sans supervision traduit mathématiquement l'échec visuel constaté lors de l'inférence. Cette performance dégradée est inhérente à la nature de la perte photométrique. Fondée sur l'hypothèse de constance de la luminosité, cette fonction de coût est hautement non-convexe et sensible aux minima locaux. En l'absence d'un ordonnancement extrêmement fin des hyperparamètres ($\lambda$, $\alpha_D$, $\alpha_S$), le réseau reste piégé et peine à converger vers une solution physiquement cohérente, illustrant la complexité intrinsèque de l'optimisation dense sans étiquettes.
+\end{itemize}
+
+\section{Estimation de champs de déformation par réseaux de neurones}
+
+\subsection{Estimation de champs de déformation par apprentissage supervisé}
+\subsubsection{L'architecture StrainNet}
+
+Face aux limites des approches génériques de flot optique pour les applications en mécanique des matériaux, Boukhtache \textit{et al.} \cite{strainnet} proposent StrainNet, un réseau de neurones convolutif spécifiquement conçu pour l'estimation de champs de déplacement et de déformation sous-pixéliques à la surface de matériaux texturés soumis à des contraintes mécaniques. L'objectif est de se substituer à la Corrélation d'Images Numériques (DIC), méthode de référence dans ce domaine, en offrant une alternative plus rapide par apprentissage supervisé.
+
+StrainNet repose sur la même architecture que le FlowNetS décrit précédemment, dont il constitue une adaptation directe. La principale différence réside dans les données d'entraînement : plutôt que d'utiliser le dataset FlyingChairs, le réseau est entraîné sur un dataset synthétique de surfaces mouchetées (\textit{speckle patterns}), qui sont les images typiquement utilisées en DIC. Ces images sont générées artificiellement avec des déformations connues, ce qui permet d'obtenir une vérité terrain précise pour l'entraînement supervisé. La métrique utilisée pour évaluer les performances est l'EPE (\textit{Average End-Point Error}), définie de la même façon que précédemment. Le modèle est décliné en trois variantes : StrainNet-h, StrainNet-f et StrainNet-l, correspondant à différents compromis entre précision et complexité du réseau.
+
+
+\subsubsection{Résultats}
+L'article \cite{strainnet} présente déjà des résultats pour un apprentissage supervisé.
+Plutôt que de réentraîner le modèle, on utilise directement les modèles pré-entraînés 
+fournis par les auteurs, et on effectue l'inférence les images de surfaces mouchetées générées comme dans l'article.
+On obtient les résultats suivants :
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=2cm]{Images/StrainNet/StrainNet-l.png}
+        \caption{Déplacement prédit par le réseau}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[height=2cm]{Images/StrainNet/Reference.png}
+        \caption{La groundtruth correspondante}
+    \end{minipage}
+\end{figure}
+
+On observe que globalement, le déplacement prédit est le bon, notamment dans la partie droite de l'image. Toutefois, on observe sur la droite certains pixels prédits avec un déplacement nul, alors que l'on observe pas ceci dans la groundtruth. Ceci s'explique car sur la gauche de l'image, les déplacements sont à très haute fréquence et qu'il est donc difficile de prédire ceci pour le réseau par rapport à des déplacements qui sont à moins haute fréquence.
+
+\subsubsection{Comparaison avec les résultats du FlowNet supervisé}
+Afin de comparer les résultats du réseau StrainNet avec le FlowNet supervisé, on va l'inférence du réseau sur les surfaces mouchetées obtenues.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=5cm]{Images/StrainNet/flownetsup.png}
+    \caption{Le déplacement obtenu en inférant avec le réseau FlowNet supervisé}
+\end{figure}
+
+Les résultats obtenus n'ont visuellement rien à voir avec la vérité terrain ou les prédictions de StrainNet. Le champ de déplacement estimé est extrêmement bruité et incohérent. 
+
+Cette baisse drastique de performance est pourtant tout à fait logique et met en lumière le problème du data shift (ou biais de domaine). En effet, le modèle FlowNet a été entraîné exclusivement sur le jeu de données FlyingChairs, caractérisé par des formes géométriques nettes (des chaises), de grands déplacements inter-frames et des contrastes marqués. Face à des textures de type moucheture (speckle patterns) propres à la Corrélation d'Images Numériques (DIC), le réseau se retrouve hors de son domaine de validité. Ne disposant pas de repères visuels macroscopiques ou de contours nets à apparier, il échoue totalement à interpréter des déplacements de très faible amplitude (souvent sous-pixéliques) caractéristiques de la déformation des matériaux.
+
+Ce constat souligne l'importance cruciale de la spécialisation des données d'entraînement pour les applications métrologiques. Pour espérer exploiter la puissance d'extraction de caractéristiques de l'encodeur de FlowNet sur ce type de physique, il serait indispensable de procéder à un fine-tuning du réseau, comme cela a été fait dans l'article inital. Réentraîner les dernières couches du modèle sur un sous-ensemble d'images de mécanique permettrait d'adapter ses filtres convolutifs aux micro-déplacements et aux textures de mouchetage, offrant ainsi une alternative intéressante à un entraînement complet de StrainNet.
+\subsection{Estimation de champs de déformation par apprentissage non supervisé}
+\subsubsection{Principe}
+De même que la difficulté à avoir le flot optique réel entre deux images, il est difficile d'obtenir le champ de déformations entre les images. Pour ce faire, on va donc de nouveau travailler avec de l'apprentissage non supervisé, avec la même idée que le FlowNet non supervisé, c'est-à-dire en utilisant la loss $\mathcal L(u,v,I(x,y,t),I(x,y,t+1))=\ell_{\text{photometric}}(u,v,I(x,y,t),I(x,y,t+1))+\lambda \ell_{\text{smoothness}}(u,v)$, plutôt que la Endpoint Error comme dans l'article \cite{strainnet}.
+
+
+\subsubsection{Résultats}
+
+On observe l'inférence suivante :
+\begin{figure}[H]
+    \centering
+    \includegraphics[height=4cm]{Images/StrainNet/unsup.png}
+    \caption{Résultat obtenu après $300$ epochs}
+\end{figure}
+
+Il n'est pas ici nécessaire de présenter la courbe de loss, car celle-ci reste constante, égale à $0{,}2$, tout au long de l'entraînement. Cette stagnation indique que le réseau n'apprend pas : la loss photométrique ne parvient pas à diminuer, ce qui signifie que le réseau ne trouve pas de signal exploitable pour mettre à jour ses poids de manière cohérente.
+
+À nouveau, les résultats obtenus sont donc loin d'être satisfaisants. Cette situation est d'autant plus frustrante que le réseau avait bien réussi à apprendre dans la version supervisée, confirmant que l'architecture est en soi adaptée au problème. Le problème réside donc bien dans la loss non supervisée et dans le choix des hyperparamètres associés, notamment $\lambda$, les paramètres $\alpha_D$ et $\alpha_S$ de la fonction de Charbonnier, le taux d'apprentissage et sa décroissance.
+
+Or, l'exploration empirique de ces hyperparamètres se heurte à une contrainte majeure : le temps d'entraînement. Chaque expérience nécessite en effet plusieurs centaines d'heures de calcul (encore plus long que le FlowNet), rendant impossible une recherche systématique par essais successifs dans le cadre de ce stage. Contrairement à la version supervisée, où la loss fournit un signal d'apprentissage clair et rapide à interpréter, la loss non supervisée est bien plus sensible aux hyperparamètres et nécessite souvent un grand nombre d'itérations avant de révéler si une configuration est prometteuse ou non. Cette contrainte temporelle a donc fortement limité la capacité à diagnostiquer et corriger le comportement du réseau.
+
+
+\section{Conclusion}
+
+Ce rapport a exploré la question de l'estimation de champs de déformation à la surface de matériaux texturés soumis à des contraintes mécaniques, en s'appuyant sur des approches d'apprentissage profond inspirées du flot optique.
+
+Dans un premier temps, les fondements théoriques du flot optique ont été rappelés, ainsi que les méthodes classiques associées. L'architecture FlowNet a ensuite été présentée et expérimentée, d'abord dans un cadre supervisé, où les résultats obtenus sont encourageants, puis dans un cadre non supervisé, où les difficultés de reproductibilité et de réglage des hyperparamètres ont empêché d'obtenir des résultats satisfaisants.
+
+Dans un second temps, le modèle StrainNet, adaptation directe du FlowNet au contexte des matériaux mouchetés, a été étudié. La version supervisée, s'appuyant sur les modèles pré-entraînés fournis par les auteurs, donne des résultats globalement cohérents avec la vérité terrain. En revanche, la version non supervisée, utilisant la même loss photométrique que pour le FlowNet non supervisé, n'a pas permis d'obtenir de résultats concluants. Là encore, la stagnation de la loss et le temps d'entraînement prohibitif ont constitué les principaux obstacles à une exploration approfondie des hyperparamètres.
+
+Au regard de ces résultats, il apparaît que l'apprentissage non supervisé pour l'estimation de champs de déformation est un problème ouvert et délicat. La loss photométrique, bien que séduisante sur le plan théorique car elle s'affranchit de la nécessité de disposer de données labellisées, s'avère en pratique très sensible aux hyperparamètres et difficile à optimiser. Une piste naturelle pour la suite serait de consacrer davantage de temps au réglage fin de ces hyperparamètres, en particulier $\lambda$ et les paramètres de la fonction de Charbonnier, ou encore d'explorer des architectures ou des stratégies de loss alternatives mieux adaptées au contexte spécifique des images de matériaux.
+
+Au-delà des résultats techniques, ce projet a été l'occasion de découvrir le monde de la recherche. Travailler sur un problème ouvert, sans solution évidente ni garantie de succès, a été une expérience enrichissante et formatrice. La confrontation à des difficultés concrètes, qu'il s'agisse de problèmes de reproductibilité, de contraintes computationnelles ou de la nécessité de comprendre en profondeur des articles scientifiques pour les implémenter, a permis de mieux appréhender ce que représente réellement une démarche de recherche. C'est une expérience qui a confirmé l'intérêt pour ce type de travail alliant rigueur mathématique et expérimentation, et qui ouvre des perspectives pour la suite du parcours académique et professionnel.
+
 
 \section{Annexes}
-\subsection{Annexe 1 : Méthode TV-L1 entre deux frames} \label{annexe:tvl}
-    \begin{python}[basicstyle=\ttfamily]
-def optical_flow(frame1, frame2):
-    gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
-    gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY) #on importe les images
-    optical_flow = cv2.optflow.DualTVL1OpticalFlow_create()
-    optical_flow.setLambda(0.1) # On choisit la valeur de lambda
-    optical_flow.setTheta(0.3)  # On chositi la valeur de theta
-    flow = optical_flow.calc(gray1, gray2, None)
-    return flow
-\end{python}
 
-\begin{python}[basicstyle=\ttfamily]
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
-
-def optical_flow(frame1, frame2):
-    gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
-    gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
-    optical_flow = cv2.optflow.DualTVL1OpticalFlow_create()
-    optical_flow.setLambda(0.1)   
-    optical_flow.setTheta(0.3)
-    flow = optical_flow.calc(gray1, gray2, None)
-    return flow
-
-def visu_optical_flow(flow, start_frame, min_magnitude=1.0):
-    vis = start_frame.copy()
-    H, W = flow.shape[:2]
-    #mag correspond à l'intensité du mouvement
-    #ang correspond à la direction du mouvement
-    mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-    mean_mag = np.mean(mag)
-    scale = max(1, 10 / (mean_mag + 1e-6))  #echelle de visualisation en fonction de la moyenne de l'intensité du mouvement
-    step = 25  # espacement des flèches
-    for y in range(0, H, step):
-        for x in range(0, W, step):
-            dx, dy = flow[y, x]
-            if np.linalg.norm(np.array([dx, dy])) > min_magnitude:  # ignorer le bruit faible
-                end_point = (int(x + scale * dx), int(y + scale * dy))
-                cv2.arrowedLine(vis, (x, y), end_point, (0, 255, 0), 1, tipLength=0.3)
-
-    vis_rgb = cv2.cvtColor(vis, cv2.COLOR_BGR2RGB) #opencv utilise BGR mais Matplotlib utilise RGB
-    plt.figure(figsize=(7, 6))
-    plt.imshow(vis_rgb)
-    plt.title("Optical Flow")
-    plt.axis("off")
-    plt.show()
-
-if __name__ == "__main__":
-    frame1 = cv2.imread("1.png")
-    frame2 = cv2.imread("2.png")
-    flow = optical_flow(frame1, frame2)
-    visu_optical_flow(flow, frame1, min_magnitude=1.0)
-\end{python}
-
-\subsection{Annexe 2 : Implémentation du Flownet supervisé} \label{annexe:tvl}
-
-\begin{python}
-    from typing import Dict, Tuple, Optional, Union
-from pathlib import Path
-from copy import deepcopy
-from datetime import datetime
-
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras import backend as K
-
-import utils_io as uio
-import utils
-from config import CONFIG_FLOWNET, CONFIG_TRAINING
-import matplotlib.pyplot as plt
-from huggingface_hub import HfApi, login
-
-
-
-class FlowNet:
-    def __init__(self, config: Dict):
-        self.config = config
-        self.model = self.get_simple_model(config)
-
-    def __getattr__(self, attr):
-        return getattr(self.model, attr)
-
-    @staticmethod
-    def get_simple_model(config: Dict) -> tf.keras.Model:
-        inputs = tf.keras.Input(shape=(384, 512, 6))
-
-        conv_1 = tf.keras.layers.Conv2D(32, 7, strides=2, padding='same', activation='relu', name='conv1')(inputs)
-        conv_2 = tf.keras.layers.Conv2D(64, 5, strides=2, padding='same', activation='relu', name='conv2')(conv_1)
-        conv_3 = tf.keras.layers.Conv2D(128, 5, strides=2, padding='same', activation='relu', name='conv3')(conv_2)
-
-        predict_3 = tf.keras.layers.Conv2D(2, 3, strides=1, padding='same', activation=None, name='predict_3')(conv_3)
-
-        upconv_2 = tf.keras.layers.Conv2DTranspose(64, 4, strides=2, padding='same', activation='relu', name='upconv_2')(conv_3)
-        flow_3 = tf.keras.layers.Conv2DTranspose(2, 4, strides=2, padding='same', activation='relu', name='flow_3')(predict_3)
-        concat_2 = tf.keras.layers.Concatenate(axis=-1, name='concat_2')([upconv_2, conv_2, flow_3])
-        predict_2 = tf.keras.layers.Conv2D(2, 3, strides=1, padding='same', activation=None, name='predict_2')(concat_2)
-
-        upconv_1 = tf.keras.layers.Conv2DTranspose(32, 4, strides=2, padding='same', activation='relu', name='upconv_1')(concat_2)
-        flow_2 = tf.keras.layers.Conv2DTranspose(2, 4, strides=2, padding='same', activation='relu', name='flow_2')(predict_2)
-        concat_1 = tf.keras.layers.Concatenate(axis=-1, name='concat_1')([upconv_1, conv_1, flow_2])
-        predict_1 = tf.keras.layers.Conv2D(2, 3, strides=1, padding='same', activation=None, name='predict_1')(concat_1)
-
-        if config['training']:
-            return tf.keras.Model(inputs=inputs, outputs=[predict_3, predict_2, predict_1])
-
-        return tf.keras.Model(inputs=inputs, outputs=predict_1)
-
-
-    def disable_training(self):
-        self.model = tf.keras.Model(
-            inputs=self.model.input,
-            outputs=self.model.output[-1]
-        )
-
-    def enable_training(self):
-        output_layers = [layer.output for layer in self.model.layers if 'predict' in layer.name]
-        self.model = tf.keras.Model(inputs=self.model.layers[0].input, outputs=output_layers)
-
-
-
-class DataGenerator:
-    def __init__(self,
-                 network_type: str,
-                 flo_normalization: Tuple[float, float],
-                 root_path: Path,
-                 batch_size: int,
-                 validation_batch_size: int,
-                 train_ratio: Union[float, int] = 1,
-                 test_ratio: Union[float, int] = 0,
-                 shuffle: bool = False,
-                 augmentations: Optional[Dict] = None):
-        self.network_type = network_type
-
-        images = list(root_path.glob('*1.ppm'))
-        self.train, self.val, self.test = utils.get_train_val_test(images, train_ratio, test_ratio, shuffle)
-        self.batch_size = batch_size
-        self.validation_batch_size = validation_batch_size
-        self.replace = True
-        self.flo_normalization = flo_normalization
-        self.augmentations = augmentations
-        
-    def next_train(self):
-
-        while True:
-            images = np.random.choice(self.train, self.batch_size, replace=self.replace)
-            img1 = [uio.read(str(img)) for img in images]
-            img2 = [uio.read(str(img).replace('1.ppm', '2.ppm')) for img in images]
-            label = [uio.read(str(img).replace('img1.ppm', 'flow.flo')) for img in images]
-
-            img1 = utils.normalize_images(img1)
-            img2 = utils.normalize_images(img2)
-            label = utils.normalize_flo(label, self.flo_normalization)
-
-            if not self.augmentations is None:
-                img1, img2, label = self._augment(img1, img2, label)
-
-            if self.network_type == 'simple':
-                images = np.concatenate([img1, img2], axis=-1)
-            elif self.network_type == 'correlation':
-                raise NotImplementedError()
-            else:
-                raise MalformedNetworkType(f'{self.network_type}: {MalformedNetworkType.__doc__}')
-
-            yield (images, np.array(label))
-
-    def next_val(self):
-
-        while True:
-            images = np.random.choice(self.val, self.validation_batch_size, replace=False)
-            img1 = [uio.read(str(img)) for img in images]
-            img2 = [uio.read(str(img).replace('1.ppm', '2.ppm')) for img in images]
-            label = [uio.read(str(img).replace('img1.ppm', 'flow.flo')) for img in images]
-
-            img1 = utils.normalize_images(img1)
-            img2 = utils.normalize_images(img2)
-            label = utils.normalize_flo(label, self.flo_normalization)
-
-            if self.network_type == 'simple':
-                images = np.concatenate([img1, img2], axis=-1)
-            elif self.network_type == 'correlation':
-                raise NotImplementedError()
-            else:
-                raise MalformedNetworkType(f'{self.network_type}: {MalformedNetworkType.__doc__}')
-
-            yield (images, np.array(label))
-
-    def _augment(self, img1, img2, label):
-        r = np.random.rand(len(self.augmentations))
-        r_inc = 0 
-        r_onoff = 2/5
-        if 'brightness' in self.augmentations and r[r_inc] <= r_onoff:
-            rdm = np.random.rand(self.batch_size) * self.augmentations['brightness']
-            def brt(x, idx): return tf.image.adjust_brightness(x, rdm[idx])
-            img1 = tf.stack([brt(im, idx) for idx, im in enumerate(img1)], axis=0)
-            img2 = tf.stack([brt(im, idx) for idx, im in enumerate(img2)], axis=0)
-            r_inc += 1
-        if 'multiplicative_colour' in self.augmentations and r[r_inc] <= r_onoff:
-            rdm = np.random.rand(self.batch_size, 3) * (self.augmentations['multiplicative_colour'][1] -
-                                                        self.augmentations['multiplicative_colour'][0]) + self.augmentations['multiplicative_colour'][0]
-
-            def mc(x, idx): return x * rdm[idx]
-            img1 = tf.clip_by_value(tf.stack([mc(im, idx) for idx, im in enumerate(img1)], axis=0), clip_value_min=0, clip_value_max=1)
-            img2 = tf.clip_by_value(tf.stack([mc(im, idx) for idx, im in enumerate(img2)], axis=0), clip_value_min=0, clip_value_max=1)
-            r_inc += 1
-        if 'gamma' in self.augmentations and r[r_inc] <= r_onoff:
-            rdm = np.random.rand(self.batch_size) * (self.augmentations['gamma'][1] - self.augmentations['gamma'][0]) + self.augmentations['gamma'][0]
-            def gam(x, idx): return tf.image.adjust_gamma(x, gamma=rdm[idx])
-            img1 = tf.stack([gam(im, idx) for idx, im in enumerate(img1)], axis=0)
-            img2 = tf.stack([gam(im, idx) for idx, im in enumerate(img2)], axis=0)
-            r_inc += 1
-        if 'contrast' in self.augmentations and r[r_inc] <= r_onoff:
-            rdm = np.random.rand(self.batch_size) * (self.augmentations['contrast'][1] - self.augmentations['contrast'][0]) + self.augmentations['contrast'][0]
-            def cts(x, idx): return tf.image.adjust_contrast(x, contrast_factor=rdm[idx])
-            img1 = tf.stack([cts(im, idx) for idx, im in enumerate(img1)], axis=0)
-            img2 = tf.stack([cts(im, idx) for idx, im in enumerate(img2)], axis=0)
-            r_inc += 1
-        if 'gaussian_noise' in self.augmentations and r[r_inc] <= r_onoff:
-            rdm = np.random.rand(self.batch_size) * self.augmentations['gaussian_noise']
-            def gau(x, idx): return x + tf.random.normal(x.shape, mean=0.0, stddev=rdm[idx], dtype=x.dtype)
-            img1 = tf.clip_by_value(tf.stack([gau(im, idx) for idx, im in enumerate(img1)], axis=0), clip_value_min=0, clip_value_max=1)
-            img2 = tf.clip_by_value(tf.stack([gau(im, idx) for idx, im in enumerate(img2)], axis=0), clip_value_min=0, clip_value_max=1)
-            r_inc += 1
-
-        return img1, img2, label
-
-# login(token="")
-
-REPO_ID = "oscaregreteau/flow"
-api = HfApi()
-
-class HuggingFaceCheckpoint(tf.keras.callbacks.Callback):
-    def __init__(self, log_file="loss_log.txt"):
-        super().__init__()
-        self.last_weight_file = None
-        self.log_file = log_file
-
-        if not os.path.exists(self.log_file):
-            with open(self.log_file, 'w') as f:
-                f.write(
-                    "epoch,loss," +
-                    ",".join([f"predict_{i}_loss" for i in range(1, 7)]) +
-                    "\n"
-                )
-
-    def on_epoch_end(self, epoch, logs=None):
-        logs = logs or {}
-        epoch_num = epoch + 1
-
-        weight_file = f"weights_epoch_{epoch_num}.weights.h5"
-        self.model.save_weights(weight_file)
-
-        api.upload_file(
-            path_or_fileobj=weight_file,
-            path_in_repo=weight_file,
-            repo_id=REPO_ID,
-            repo_type="model",
-            commit_message=f"Update weights (epoch {epoch_num})"
-        )
-
-        if self.last_weight_file is not None:
-            try:
-                api.delete_file(
-                    repo_id=REPO_ID,
-                    path_in_repo=self.last_weight_file,
-                    repo_type="model",
-                    commit_message="Remove previous weights"
-                )
-            except Exception as e:
-                print(f"Warning: could not delete previous weights: {e}")
-
-        os.remove(weight_file)
-        self.last_weight_file = weight_file
-
-        with open(self.log_file, 'a') as f:
-            overall_loss = logs.get('loss', 0)
-            per_output_losses = [logs.get(f'predict_{i}_loss', 0) for i in range(1, 7)]
-            f.write(
-                f"{epoch_num},{overall_loss:.6f}," +
-                ",".join(f"{v:.6f}" for v in per_output_losses) +
-                "\n"
-            )
-
-        api.upload_file(
-            path_or_fileobj=self.log_file,
-            path_in_repo=self.log_file,
-            repo_id=REPO_ID,
-            repo_type="model",
-            commit_message=f"Update loss log after epoch {epoch_num}"
-        )
-
-        print(f"Epoch {epoch_num}: latest weights + loss log uploaded")
-
-
-class EndPointError(tf.keras.losses.Loss):
-    def call(self, y_true, y_pred):
-        return K.sqrt(K.sum(K.square(tf.image.resize(y_true, y_pred.shape[1:3]) - y_pred), axis=1, keepdims=True))
-    
-
-def main():
-    config_network = deepcopy(CONFIG_FLOWNET)
-    config_training = deepcopy(CONFIG_TRAINING)
-    flownet = FlowNet(config_network)
-    loss=EndPointError()
-
-    data_generator = DataGenerator(config_network['architecture'],
-                                   config_network['flo_normalization'],
-                                   Path(r'/Users/oscar/Downloads/FlyingChairs_release/data'),
-                                   config_training['batch_size'],
-                                   config_training['validation_batch_size'],
-                                   config_training['train_ratio'],
-                                   config_training['test_ratio'],
-                                   config_training['shuffle'],
-                                   config_training['augmentations'])
-    checkpoint_cb = HuggingFaceCheckpoint()
-    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=1.6e-5, decay_steps=100000, decay_rate=0.5, staircase=True)
-    flownet.compile(
-        optimizer=tf.keras.optimizers.Adam(lr_schedule), 
-        loss=[loss] * 6,
-        loss_weights=config_training['loss_weights'][::-1]
-    )
-
-    history = flownet.fit(
-        data_generator.next_train(),
-        steps_per_epoch=200 // config_training['batch_size'],
-        epochs=5,
-        callbacks=[checkpoint_cb]
-    )
-
-    flownet.save_weights("flownet.weights.h5")
-    for key in history.history:
-        if 'loss' in key and key != 'loss':  # skip overall loss
-            plt.plot(history.history[key], label=key)
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Per-output Loss per Epoch')
-    plt.legend()
-    plt.show()
-
-if __name__ == "__main__":
-    main()
-
-\end{python}
+Tout le code est disponible sur un repository GitHub : \url{https://github.com/oscaregreteau/Projet-Recherche}
 \printbibliography[heading=bibintoc,title={Références}]
 \end{document}
 
